@@ -16,11 +16,12 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState("");
 
-  // грузим бренды для фильтра
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       setErrorText("");
+
       const { data, error } = await supabase
         .from("offers_view")
         .select("brand")
@@ -32,7 +33,11 @@ export default function Page() {
         setErrorText(error.message);
         return;
       }
-      const uniq = Array.from(new Set((data || []).map((x) => x.brand).filter(Boolean))).sort();
+
+      const uniq = Array.from(
+        new Set((data || []).map((x) => x.brand).filter(Boolean))
+      ).sort();
+
       setBrands(uniq);
     })();
 
@@ -41,7 +46,10 @@ export default function Page() {
     };
   }, []);
 
-  const canSearch = useMemo(() => query.trim().length >= 2 || brand !== "ALL", [query, brand]);
+  const canSearch = useMemo(
+    () => query.trim().length >= 2 || brand !== "ALL",
+    [query, brand]
+  );
 
   async function runSearch() {
     setLoading(true);
@@ -52,7 +60,7 @@ export default function Page() {
 
     let req = supabase
       .from("offers_view")
-      .select("brand,pn,name,qty,price_byn,supplier,pricelist_name")
+      .select("brand,pn,name,qty,price_byn,price_rub,supplier,pricelist_name")
       .order("brand", { ascending: true })
       .order("pn", { ascending: true })
       .order("price_byn", { ascending: true });
@@ -60,6 +68,7 @@ export default function Page() {
     if (q) {
       req = req.or(`pn.ilike.${pattern},name.ilike.${pattern}`);
     }
+
     if (brand !== "ALL") {
       req = req.eq("brand", brand);
     }
@@ -76,12 +85,12 @@ export default function Page() {
     setLoading(false);
   }
 
-  // автопоиск с небольшой задержкой (чтобы не долбить базу на каждый символ)
   useEffect(() => {
     if (!canSearch) {
       setRows([]);
       return;
     }
+
     const t = setTimeout(() => runSearch(), 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,11 +99,21 @@ export default function Page() {
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: 20 }}>
       <h1 style={{ margin: 0, fontSize: 24 }}>Поиск по прайсам</h1>
+
       <p style={{ marginTop: 8, color: "#666" }}>
-        Вводи минимум 2 символа. Ищет по <b>P/N</b> и по <b>наименованию</b>. Фильтр по бренду слева.
+        Вводи минимум 2 символа. Ищет по <b>P/N</b> и по <b>наименованию</b>.
+        Фильтр по бренду слева.
       </p>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          alignItems: "center",
+          marginTop: 16,
+          flexWrap: "wrap"
+        }}
+      >
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -149,92 +168,131 @@ export default function Page() {
       </div>
 
       {errorText && (
-        <div style={{ marginTop: 14, padding: 12, border: "1px solid #f00", borderRadius: 10, color: "#900" }}>
+        <div
+          style={{
+            marginTop: 14,
+            padding: 12,
+            border: "1px solid #f00",
+            borderRadius: 10,
+            color: "#900"
+          }}
+        >
           Ошибка: {errorText}
         </div>
       )}
 
       <div style={{ marginTop: 16 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: 13,
+            tableLayout: "fixed"
+          }}
+        >
           <thead>
             <tr>
               {["Бренд", "P/N", "Наименование", "Кол-во", "Цена (BYN)", "Поставщик/прайс"].map((h) => (
                 <th
-  key={h}
-  style={{
-    textAlign: "left",
-    padding: "10px 8px",
-    borderBottom: "2px solid #ddd",
-    whiteSpace: h === "Наименование" ? "normal" : "nowrap"
-  }}
->
+                  key={h}
+                  style={{
+                    textAlign: "left",
+                    padding: "10px 8px",
+                    borderBottom: "2px solid #ddd",
+                    whiteSpace: h === "Наименование" ? "normal" : "nowrap"
+                  }}
+                >
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
+
           <tbody>
             {rows.map((r, idx) => (
               <tr key={`${r.brand}-${r.pn}-${r.price_byn}-${idx}`}>
-                <td style={{ padding: "8px", borderBottom: "1px solid #eee", whiteSpace: "nowrap", width: "90px" }}>{r.brand}</td>
-               <td
-  style={{
-    padding: "8px",
-    borderBottom: "1px solid #eee",
-    whiteSpace: "normal",
-    overflowWrap: "anywhere",
-    width: "140px"
-  }}
->
-  {r.pn}
-</td>
-               <td
-  style={{
-    padding: "8px",
-    borderBottom: "1px solid #eee",
-    whiteSpace: "normal",
-    overflowWrap: "anywhere",
-    wordBreak: "break-word"
-  }}
->
-  {r.name}
-</td>
-              <td
-  style={{
-    padding: "8px",
-    borderBottom: "1px solid #eee",
-    whiteSpace: "nowrap",
-    width: "70px",
-    textAlign: "center"
-  }}
->
-  {r.qty ?? ""}
-</td>
                 <td
-  style={{
-    padding: "8px",
-    borderBottom: "1px solid #eee",
-    whiteSpace: "nowrap",
-    width: "110px"
-  }}
->
-              <td
-  style={{
-    padding: "8px",
-    borderBottom: "1px solid #eee",
-    whiteSpace: "normal",
-    overflowWrap: "break-word",
-    width: "160px"
-  }}
->
-  {r.supplier} / {r.pricelist_name}
-</td>
+                  style={{
+                    padding: "8px",
+                    borderBottom: "1px solid #eee",
+                    whiteSpace: "nowrap",
+                    width: "90px"
+                  }}
+                >
+                  {r.brand}
+                </td>
+
+                <td
+                  style={{
+                    padding: "8px",
+                    borderBottom: "1px solid #eee",
+                    whiteSpace: "normal",
+                    overflowWrap: "anywhere",
+                    width: "140px"
+                  }}
+                >
+                  {r.pn}
+                </td>
+
+                <td
+                  style={{
+                    padding: "8px",
+                    borderBottom: "1px solid #eee",
+                    whiteSpace: "normal",
+                    overflowWrap: "anywhere",
+                    wordBreak: "break-word"
+                  }}
+                >
+                  {r.name}
+                </td>
+
+                <td
+                  style={{
+                    padding: "8px",
+                    borderBottom: "1px solid #eee",
+                    whiteSpace: "nowrap",
+                    width: "70px",
+                    textAlign: "center"
+                  }}
+                >
+                  {r.qty ?? ""}
+                </td>
+
+                <td
+                  style={{
+                    padding: "8px",
+                    borderBottom: "1px solid #eee",
+                    whiteSpace: "nowrap",
+                    width: "110px"
+                  }}
+                >
+                  {typeof r.price_byn === "number"
+                    ? r.price_byn.toFixed(2)
+                    : (r.price_rub && String(r.price_rub).trim() !== ""
+                        ? r.price_rub
+                        : "")}
+                </td>
+
+                <td
+                  style={{
+                    padding: "8px",
+                    borderBottom: "1px solid #eee",
+                    whiteSpace: "normal",
+                    overflowWrap: "break-word",
+                    width: "160px"
+                  }}
+                >
+                  {r.supplier} / {r.pricelist_name}
+                </td>
               </tr>
             ))}
+
             {rows.length === 0 && (
               <tr>
                 <td colSpan={6} style={{ padding: "14px 8px", color: "#666" }}>
-                  {canSearch ? "Ничего не найдено." : "Начни вводить запрос (минимум 2 символа) или выбери бренд."}
+                  {canSearch
+                    ? "Ничего не найдено."
+                    : "Начни вводить запрос (минимум 2 символа) или выбери бренд."}
                 </td>
               </tr>
             )}
