@@ -218,7 +218,7 @@ export default function Page() {
     width: "110px"
   }}
 >
-               <td
+              <td
   style={{
     padding: "8px",
     borderBottom: "1px solid #eee",
