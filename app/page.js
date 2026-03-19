@@ -154,20 +154,20 @@ export default function Page() {
         </div>
       )}
 
-      <div style={{ marginTop: 16, overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <div style={{ marginTop: 16 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" }}>
           <thead>
             <tr>
               {["Бренд", "P/N", "Наименование", "Кол-во", "Цена (BYN)", "Поставщик/прайс"].map((h) => (
                 <th
-                  key={h}
-                  style={{
-                    textAlign: "left",
-                    padding: "10px 8px",
-                    borderBottom: "2px solid #ddd",
-                    whiteSpace: "nowrap"
-                  }}
-                >
+  key={h}
+  style={{
+    textAlign: "left",
+    padding: "10px 8px",
+    borderBottom: "2px solid #ddd",
+    whiteSpace: h === "Наименование" ? "normal" : "nowrap"
+  }}
+>
                   {h}
                 </th>
               ))}
@@ -176,18 +176,59 @@ export default function Page() {
           <tbody>
             {rows.map((r, idx) => (
               <tr key={`${r.brand}-${r.pn}-${r.price_byn}-${idx}`}>
-                <td style={{ padding: "8px", borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>{r.brand}</td>
-                <td style={{ padding: "8px", borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>{r.pn}</td>
-                <td style={{ padding: "8px", borderBottom: "1px solid #eee", minWidth: 420 }}>{r.name}</td>
-                <td style={{ padding: "8px", borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>
-                  {r.qty ?? ""}
-                </td>
-                <td style={{ padding: "8px", borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>
-                  {typeof r.price_byn === "number" ? r.price_byn.toFixed(2) : r.price_byn}
-                </td>
-                <td style={{ padding: "8px", borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>
-                  {r.supplier} / {r.pricelist_name}
-                </td>
+                <td style={{ padding: "8px", borderBottom: "1px solid #eee", whiteSpace: "nowrap", width: "90px" }}>{r.brand}</td>
+               <td
+  style={{
+    padding: "8px",
+    borderBottom: "1px solid #eee",
+    whiteSpace: "normal",
+    overflowWrap: "anywhere",
+    width: "140px"
+  }}
+>
+  {r.pn}
+</td>
+               <td
+  style={{
+    padding: "8px",
+    borderBottom: "1px solid #eee",
+    whiteSpace: "normal",
+    overflowWrap: "anywhere",
+    wordBreak: "break-word"
+  }}
+>
+  {r.name}
+</td>
+              <td
+  style={{
+    padding: "8px",
+    borderBottom: "1px solid #eee",
+    whiteSpace: "nowrap",
+    width: "70px",
+    textAlign: "center"
+  }}
+>
+  {r.qty ?? ""}
+</td>
+                <td
+  style={{
+    padding: "8px",
+    borderBottom: "1px solid #eee",
+    whiteSpace: "nowrap",
+    width: "110px"
+  }}
+>
+               <td
+  style={{
+    padding: "8px",
+    borderBottom: "1px solid #eee",
+    whiteSpace: "normal",
+    overflowWrap: "break-word",
+    width: "160px"
+  }}
+>
+  {r.supplier} / {r.pricelist_name}
+</td>
               </tr>
             ))}
             {rows.length === 0 && (
