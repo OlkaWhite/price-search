@@ -97,10 +97,17 @@ export default function Page() {
   }, [query, brand]);
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: 20 }}>
-      <h1 style={{ margin: 0, fontSize: 24 }}>Поиск по прайсам</h1>
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 1600,
+        margin: "0 auto",
+        padding: "20px 24px"
+      }}
+    >
+      <h1 style={{ margin: 0, fontSize: 28 }}>Поиск по прайсам</h1>
 
-      <p style={{ marginTop: 8, color: "#666" }}>
+      <p style={{ marginTop: 8, color: "#666", fontSize: 15 }}>
         Вводи минимум 2 символа. Ищет по <b>P/N</b> и по <b>наименованию</b>.
         Фильтр по бренду слева.
       </p>
@@ -111,6 +118,7 @@ export default function Page() {
           gap: 12,
           alignItems: "center",
           marginTop: 16,
+          marginBottom: 18,
           flexWrap: "wrap"
         }}
       >
@@ -190,6 +198,15 @@ export default function Page() {
             tableLayout: "fixed"
           }}
         >
+          <colgroup>
+            <col style={{ width: "90px" }} />
+            <col style={{ width: "150px" }} />
+            <col style={{ width: "auto" }} />
+            <col style={{ width: "80px" }} />
+            <col style={{ width: "120px" }} />
+            <col style={{ width: "180px" }} />
+          </colgroup>
+
           <thead>
             <tr>
               {["Бренд", "P/N", "Наименование", "Кол-во", "Цена (BYN)", "Поставщик/прайс"].map((h) => (
@@ -199,7 +216,8 @@ export default function Page() {
                     textAlign: "left",
                     padding: "10px 8px",
                     borderBottom: "2px solid #ddd",
-                    whiteSpace: h === "Наименование" ? "normal" : "nowrap"
+                    whiteSpace: h === "Наименование" ? "normal" : "nowrap",
+                    verticalAlign: "top"
                   }}
                 >
                   {h}
@@ -216,7 +234,7 @@ export default function Page() {
                     padding: "8px",
                     borderBottom: "1px solid #eee",
                     whiteSpace: "nowrap",
-                    width: "90px"
+                    verticalAlign: "top"
                   }}
                 >
                   {r.brand}
@@ -228,7 +246,8 @@ export default function Page() {
                     borderBottom: "1px solid #eee",
                     whiteSpace: "normal",
                     overflowWrap: "anywhere",
-                    width: "140px"
+                    wordBreak: "break-word",
+                    verticalAlign: "top"
                   }}
                 >
                   {r.pn}
@@ -240,7 +259,9 @@ export default function Page() {
                     borderBottom: "1px solid #eee",
                     whiteSpace: "normal",
                     overflowWrap: "anywhere",
-                    wordBreak: "break-word"
+                    wordBreak: "break-word",
+                    lineHeight: 1.35,
+                    verticalAlign: "top"
                   }}
                 >
                   {r.name}
@@ -251,8 +272,8 @@ export default function Page() {
                     padding: "8px",
                     borderBottom: "1px solid #eee",
                     whiteSpace: "nowrap",
-                    width: "70px",
-                    textAlign: "center"
+                    textAlign: "center",
+                    verticalAlign: "top"
                   }}
                 >
                   {r.qty ?? ""}
@@ -263,7 +284,7 @@ export default function Page() {
                     padding: "8px",
                     borderBottom: "1px solid #eee",
                     whiteSpace: "nowrap",
-                    width: "110px"
+                    verticalAlign: "top"
                   }}
                 >
                   {typeof r.price_byn === "number"
@@ -279,7 +300,8 @@ export default function Page() {
                     borderBottom: "1px solid #eee",
                     whiteSpace: "normal",
                     overflowWrap: "break-word",
-                    width: "160px"
+                    wordBreak: "break-word",
+                    verticalAlign: "top"
                   }}
                 >
                   {r.supplier} / {r.pricelist_name}
