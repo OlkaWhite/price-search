@@ -100,7 +100,7 @@ export default function Page() {
     <div
       style={{
         width: "100%",
-        maxWidth: 1600,
+        maxWidth: 2500,
         margin: "0 auto",
         padding: "20px 24px"
       }}
