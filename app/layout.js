@@ -1,3 +1,4 @@
+import "./globals.css";
 export const metadata = {
   title: "Price Search",
   description: "Поиск по прайсам"
