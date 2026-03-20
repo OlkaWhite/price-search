@@ -216,6 +216,38 @@ export default function Page() {
         padding: "20px 16px"
       }}
     >
+
+      <div
+  style={{
+    display: "flex",
+    justifyContent: "flex-end",
+    marginBottom: 12
+  }}
+>
+  <a
+    href="https://t.me/OlkaWhite"
+    target="_blank"
+    rel="noopener noreferrer"
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 14,
+      fontWeight: 600,
+      color: "#111",
+      textDecoration: "none",
+      border: "1px solid #dcdcdc",
+      borderRadius: 999,
+      padding: "10px 14px",
+      background: "#fff",
+      boxShadow: "0 4px 14px rgba(0,0,0,0.08)"
+    }}
+  >
+    <span style={{ fontSize: 16 }}>✈️</span>
+    <span>Связаться с разработчиком в Telegram</span>
+  </a>
+</div>
+      
       <h1 style={{ margin: 0, fontSize: 28 }}>Поиск по прайсам</h1>
 
       <p style={{ marginTop: 8, color: "#666", fontSize: 15 }}>
