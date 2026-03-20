@@ -11,10 +11,12 @@ const supabase = createClient(
 export default function Page() {
   const [query, setQuery] = useState("");
   const [brand, setBrand] = useState("ALL");
+  const [priceSort, setPriceSort] = useState("default");
   const [brands, setBrands] = useState([]);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState("");
+  
 
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +46,7 @@ export default function Page() {
 
   const canSearch = useMemo(
     () => query.trim().length >= 2 || brand !== "ALL",
-    [query, brand]
+    [query, brand, priceSort]
   );
 
   const visibleBrands = useMemo(() => {
@@ -66,10 +68,7 @@ export default function Page() {
 
     let req = supabase
       .from("offers_view")
-      .select("brand,pn,name,qty,price_byn,price_rub,supplier,pricelist_name")
-      .order("brand", { ascending: true })
-      .order("pn", { ascending: true })
-      .order("price_byn", { ascending: true });
+      .select("brand,pn,name,qty,price_byn,price_rub,supplier,pricelist_name");
 
     if (q) {
       req = req.or(`pn.ilike.${pattern},name.ilike.${pattern}`);
@@ -78,6 +77,17 @@ export default function Page() {
     if (brand !== "ALL") {
       req = req.eq("brand", brand);
     }
+
+    if (priceSort === "asc") {
+  req = req.order("price_byn", { ascending: true, nullsFirst: false });
+} else if (priceSort === "desc") {
+  req = req.order("price_byn", { ascending: false, nullsFirst: false });
+} else {
+  req = req
+    .order("brand", { ascending: true })
+    .order("pn", { ascending: true })
+    .order("price_byn", { ascending: true });
+}
 
     const { data, error } = await req.limit(200);
 
@@ -160,6 +170,22 @@ export default function Page() {
           ))}
         </select>
 
+     <select
+  value={priceSort}
+  onChange={(e) => setPriceSort(e.target.value)}
+  style={{
+    padding: "10px 12px",
+    border: "1px solid #ccc",
+    borderRadius: 10,
+    fontSize: 14
+  }}
+>
+  <option value="default">Сортировка цены</option>
+  <option value="asc">Цена: по возрастанию</option>
+  <option value="desc">Цена: по убыванию</option>
+</select>
+
+  
         <button
           onClick={runSearch}
           disabled={!canSearch || loading}
