@@ -23,9 +23,8 @@ export default function Page() {
       setErrorText("");
 
       const { data, error } = await supabase
-        .from("offers_view")
-        .select("brand")
-        .limit(100000);
+        .from("brands_view")
+        .select("brand");
 
       if (cancelled) return;
 
@@ -34,11 +33,8 @@ export default function Page() {
         return;
       }
 
-      const uniq = Array.from(
-        new Set((data || []).map((x) => x.brand).filter(Boolean))
-      ).sort();
-
-      setBrands(uniq);
+      const uniq = (data || []).map((x) => x.brand).filter(Boolean);
+        setBrands(uniq);
     })();
 
     return () => {
