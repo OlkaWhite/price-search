@@ -47,6 +47,16 @@ export default function Page() {
     [query, brand]
   );
 
+  const visibleBrands = useMemo(() => {
+  if (!canSearch) return brands;
+
+  const uniq = Array.from(
+    new Set((rows || []).map((x) => x.brand).filter(Boolean))
+  ).sort();
+
+  return uniq;
+}, [brands, rows, canSearch]);
+
   async function runSearch() {
     setLoading(true);
     setErrorText("");
@@ -143,7 +153,7 @@ export default function Page() {
           }}
         >
           <option value="ALL">Все бренды</option>
-          {brands.map((b) => (
+          {visibleBrands.map((b) => (
             <option key={b} value={b}>
               {b}
             </option>
