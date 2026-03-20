@@ -16,10 +16,12 @@ export default function Page() {
   const [priceSort, setPriceSort] = useState("default");
 
   const [brands, setBrands] = useState([]);
+  const [searchBrands, setSearchBrands] = useState([]);
   const [rows, setRows] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingBrands, setLoadingBrands] = useState(false);
   const [errorText, setErrorText] = useState("");
 
   const [page, setPage] = useState(0);
@@ -58,16 +60,10 @@ export default function Page() {
   );
 
   const visibleBrands = useMemo(() => {
-    if (!canSearch) return brands;
+    return canSearch ? searchBrands : brands;
+  }, [canSearch, searchBrands, brands]);
 
-    const uniq = Array.from(
-      new Set((rows || []).map((x) => x.brand).filter(Boolean))
-    ).sort();
-
-    return uniq;
-  }, [brands, rows, canSearch]);
-
-  function buildQuery() {
+  function buildRowsQuery() {
     const q = query.trim();
     const pattern = `%${q}%`;
 
@@ -97,6 +93,38 @@ export default function Page() {
     return req;
   }
 
+  async function loadSearchBrands() {
+    if (!canSearch) {
+      setSearchBrands([]);
+      return;
+    }
+
+    setLoadingBrands(true);
+
+    const q = query.trim();
+    const pattern = `%${q}%`;
+
+    let req = supabase
+      .from("offers_view")
+      .select("brand");
+
+    if (q) {
+      req = req.or(`pn.ilike.${pattern},name.ilike.${pattern}`);
+    }
+
+    const { data, error } = await req;
+
+    if (!error) {
+      const uniq = Array.from(
+        new Set((data || []).map((x) => x.brand).filter(Boolean))
+      ).sort();
+
+      setSearchBrands(uniq);
+    }
+
+    setLoadingBrands(false);
+  }
+
   async function runSearch(reset = true) {
     const nextPage = reset ? 0 : page + 1;
     const from = nextPage * PAGE_SIZE;
@@ -110,8 +138,7 @@ export default function Page() {
       setErrorText("");
     }
 
-    let req = buildQuery().range(from, to);
-
+    const req = buildRowsQuery().range(from, to);
     const { data, error } = await req;
 
     if (error) {
@@ -152,6 +179,15 @@ export default function Page() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, brand, priceSort]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      loadSearchBrands();
+    }, 350);
+
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
 
   useEffect(() => {
     function handleScroll() {
@@ -263,6 +299,12 @@ export default function Page() {
         <div style={{ color: "#666", fontSize: 13 }}>
           {rows.length > 0 ? `Загружено: ${rows.length}` : " "}
         </div>
+
+        {loadingBrands && (
+          <div style={{ color: "#666", fontSize: 13 }}>
+            Обновляю список брендов...
+          </div>
+        )}
       </div>
 
       {errorText && (
