@@ -220,6 +220,37 @@ export default function Page() {
   
       
       <h1 style={{ margin: 0, fontSize: 28 }}>Поиск по прайсам</h1>
+      
+       <div
+  style={{
+    display: "flex",
+    justifyContent: "flex-end",
+    marginTop: 30,
+    marginBottom: -4
+  }}
+>
+  <a
+    href="https://t.me/OlkaWhite"
+    target="_blank"
+    rel="noopener noreferrer"
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "10px 12px",
+      border: "1px solid #ccc",
+      borderRadius: 10,
+      fontSize: 14,
+      color: "#111",
+      textDecoration: "none",
+      background: "#fff",
+      whiteSpace: "nowrap"
+    }}
+  >
+    <span style={{ fontSize: 15 }}>✈️</span>
+    <span>Связаться с разработчиком</span>
+  </a>
+</div>
 
       <p style={{ marginTop: 8, color: "#666", fontSize: 15 }}>
         Вводи минимум 2 символа. Ищет по <b>P/N</b> и по <b>наименованию</b>.
@@ -312,36 +343,7 @@ export default function Page() {
         )}
       </div>
 
- <div
-  style={{
-    display: "flex",
-    justifyContent: "flex-end",
-    marginTop: 30,
-    marginBottom: -4
-  }}
->
-  <a
-    href="https://t.me/OlkaWhite"
-    target="_blank"
-    rel="noopener noreferrer"
-    style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "10px 12px",
-      border: "1px solid #ccc",
-      borderRadius: 10,
-      fontSize: 14,
-      color: "#111",
-      textDecoration: "none",
-      background: "#fff",
-      whiteSpace: "nowrap"
-    }}
-  >
-    <span style={{ fontSize: 15 }}>✈️</span>
-    <span>Связаться с разработчиком</span>
-  </a>
-</div>
+
 
       {errorText && (
         <div
