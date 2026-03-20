@@ -217,36 +217,7 @@ export default function Page() {
       }}
     >
 
-     <div
-  style={{
-    display: "flex",
-    justifyContent: "flex-end",
-    marginTop: 30,
-    marginBottom: -4
-  }}
->
-  <a
-    href="https://t.me/OlkaWhite"
-    target="_blank"
-    rel="noopener noreferrer"
-    style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "10px 12px",
-      border: "1px solid #ccc",
-      borderRadius: 10,
-      fontSize: 14,
-      color: "#111",
-      textDecoration: "none",
-      background: "#fff",
-      whiteSpace: "nowrap"
-    }}
-  >
-    <span style={{ fontSize: 15 }}>✈️</span>
-    <span>Связаться с разработчиком</span>
-  </a>
-</div>
+  
       
       <h1 style={{ margin: 0, fontSize: 28 }}>Поиск по прайсам</h1>
 
@@ -278,6 +249,37 @@ export default function Page() {
             fontSize: 14
           }}
         />
+
+             <div
+  style={{
+    display: "flex",
+    justifyContent: "flex-end",
+    marginTop: 30,
+    marginBottom: -4
+  }}
+>
+  <a
+    href="https://t.me/OlkaWhite"
+    target="_blank"
+    rel="noopener noreferrer"
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "10px 12px",
+      border: "1px solid #ccc",
+      borderRadius: 10,
+      fontSize: 14,
+      color: "#111",
+      textDecoration: "none",
+      background: "#fff",
+      whiteSpace: "nowrap"
+    }}
+  >
+    <span style={{ fontSize: 15 }}>✈️</span>
+    <span>Связаться с разработчиком</span>
+  </a>
+</div>
 
         <select
           value={brand}
