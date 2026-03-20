@@ -16,6 +16,7 @@ export default function Page() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState("");
+  const [showScrollTop, setShowScrollTop] = useState(false);
   
 
   useEffect(() => {
@@ -89,7 +90,7 @@ export default function Page() {
     .order("price_byn", { ascending: true });
 }
 
-    const { data, error } = await req.limit(200);
+    const { data, error } = await req;
 
     if (error) {
       setErrorText(error.message);
@@ -100,6 +101,23 @@ export default function Page() {
 
     setLoading(false);
   }
+
+  useEffect(() => {
+  function handleScroll() {
+    setShowScrollTop(window.scrollY > 700);
+  }
+
+  window.addEventListener("scroll", handleScroll);
+  handleScroll();
+
+  return () => window.removeEventListener("scroll", handleScroll);
+}, []);
+  function scrollToTop() {
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+}
 
   useEffect(() => {
     if (!canSearch) {
@@ -203,7 +221,7 @@ export default function Page() {
         </button>
 
         <div style={{ color: "#666", fontSize: 13 }}>
-          {rows.length > 0 ? `Найдено: ${rows.length} (показаны первые 200)` : " "}
+          {rows.length > 0 ? `Найдено: ${rows.length} ` : " "}
         </div>
       </div>
 
@@ -353,6 +371,27 @@ export default function Page() {
           </tbody>
         </table>
       </div>
+            {showScrollTop && (
+  <button
+    onClick={scrollToTop}
+    style={{
+      position: "fixed",
+      right: 24,
+      bottom: 24,
+      zIndex: 1000,
+      padding: "12px 16px",
+      borderRadius: 999,
+      border: "1px solid #111",
+      background: "#111",
+      color: "#fff",
+      cursor: "pointer",
+      fontSize: 14,
+      boxShadow: "0 8px 24px rgba(0,0,0,0.18)"
+    }}
+  >
+    В начало списка
+  </button>
+)}
     </div>
   );
 }
