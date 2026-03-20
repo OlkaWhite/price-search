@@ -217,11 +217,12 @@ export default function Page() {
       }}
     >
 
-      <div
+     <div
   style={{
     display: "flex",
     justifyContent: "flex-end",
-    marginBottom: 12
+    marginTop: 8,
+    marginBottom: -4
   }}
 >
   <a
@@ -232,19 +233,18 @@ export default function Page() {
       display: "inline-flex",
       alignItems: "center",
       gap: 8,
+      padding: "10px 12px",
+      border: "1px solid #ccc",
+      borderRadius: 10,
       fontSize: 14,
-      fontWeight: 600,
       color: "#111",
       textDecoration: "none",
-      border: "1px solid #dcdcdc",
-      borderRadius: 999,
-      padding: "10px 14px",
       background: "#fff",
-      boxShadow: "0 4px 14px rgba(0,0,0,0.08)"
+      whiteSpace: "nowrap"
     }}
   >
-    <span style={{ fontSize: 16 }}>✈️</span>
-    <span>Связаться с разработчиком в Telegram</span>
+    <span style={{ fontSize: 15 }}>✈️</span>
+    <span>Связаться с разработчиком</span>
   </a>
 </div>
       
