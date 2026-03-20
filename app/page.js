@@ -8,16 +8,23 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+const PAGE_SIZE = 100;
+
 export default function Page() {
   const [query, setQuery] = useState("");
   const [brand, setBrand] = useState("ALL");
   const [priceSort, setPriceSort] = useState("default");
+
   const [brands, setBrands] = useState([]);
   const [rows, setRows] = useState([]);
+
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [errorText, setErrorText] = useState("");
+
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  
 
   useEffect(() => {
     let cancelled = false;
@@ -37,7 +44,7 @@ export default function Page() {
       }
 
       const uniq = (data || []).map((x) => x.brand).filter(Boolean);
-        setBrands(uniq);
+      setBrands(uniq);
     })();
 
     return () => {
@@ -47,23 +54,20 @@ export default function Page() {
 
   const canSearch = useMemo(
     () => query.trim().length >= 2 || brand !== "ALL",
-    [query, brand, priceSort]
+    [query, brand]
   );
 
   const visibleBrands = useMemo(() => {
-  if (!canSearch) return brands;
+    if (!canSearch) return brands;
 
-  const uniq = Array.from(
-    new Set((rows || []).map((x) => x.brand).filter(Boolean))
-  ).sort();
+    const uniq = Array.from(
+      new Set((rows || []).map((x) => x.brand).filter(Boolean))
+    ).sort();
 
-  return uniq;
-}, [brands, rows, canSearch]);
+    return uniq;
+  }, [brands, rows, canSearch]);
 
-  async function runSearch() {
-    setLoading(true);
-    setErrorText("");
-
+  function buildQuery() {
     const q = query.trim();
     const pattern = `%${q}%`;
 
@@ -80,63 +84,100 @@ export default function Page() {
     }
 
     if (priceSort === "asc") {
-  req = req.order("price_byn", { ascending: true, nullsFirst: false });
-} else if (priceSort === "desc") {
-  req = req.order("price_byn", { ascending: false, nullsFirst: false });
-} else {
-  req = req
-    .order("brand", { ascending: true })
-    .order("pn", { ascending: true })
-    .order("price_byn", { ascending: true });
-}
+      req = req.order("price_byn", { ascending: true, nullsFirst: false });
+    } else if (priceSort === "desc") {
+      req = req.order("price_byn", { ascending: false, nullsFirst: false });
+    } else {
+      req = req
+        .order("brand", { ascending: true })
+        .order("pn", { ascending: true })
+        .order("price_byn", { ascending: true, nullsFirst: false });
+    }
+
+    return req;
+  }
+
+  async function runSearch(reset = true) {
+    const nextPage = reset ? 0 : page + 1;
+    const from = nextPage * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    if (reset) {
+      setLoading(true);
+      setErrorText("");
+    } else {
+      setLoadingMore(true);
+      setErrorText("");
+    }
+
+    let req = buildQuery().range(from, to);
 
     const { data, error } = await req;
 
     if (error) {
       setErrorText(error.message);
-      setRows([]);
+      if (reset) {
+        setRows([]);
+        setHasMore(false);
+      }
     } else {
-      setRows(data || []);
+      const incoming = data || [];
+
+      if (reset) {
+        setRows(incoming);
+      } else {
+        setRows((prev) => [...prev, ...incoming]);
+      }
+
+      setPage(nextPage);
+      setHasMore(incoming.length === PAGE_SIZE);
     }
 
-    setLoading(false);
+    if (reset) {
+      setLoading(false);
+    } else {
+      setLoadingMore(false);
+    }
   }
-
-  useEffect(() => {
-  function handleScroll() {
-    setShowScrollTop(window.scrollY > 700);
-  }
-
-  window.addEventListener("scroll", handleScroll);
-  handleScroll();
-
-  return () => window.removeEventListener("scroll", handleScroll);
-}, []);
-  function scrollToTop() {
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
-}
 
   useEffect(() => {
     if (!canSearch) {
       setRows([]);
+      setPage(0);
+      setHasMore(false);
       return;
     }
 
-    const t = setTimeout(() => runSearch(), 350);
+    const t = setTimeout(() => runSearch(true), 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, brand]);
+  }, [query, brand, priceSort]);
+
+  useEffect(() => {
+    function handleScroll() {
+      setShowScrollTop(window.scrollY > 700);
+    }
+
+    window.addEventListener("scroll", handleScroll);
+    handleScroll();
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  function scrollToTop() {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  }
 
   return (
     <div
       style={{
-        width: "100%",
-        maxWidth: 2500,
+        width: "98vw",
+        maxWidth: 2240,
         margin: "0 auto",
-        padding: "20px 24px"
+        padding: "20px 16px"
       }}
     >
       <h1 style={{ margin: 0, fontSize: 28 }}>Поиск по прайсам</h1>
@@ -188,24 +229,23 @@ export default function Page() {
           ))}
         </select>
 
-     <select
-  value={priceSort}
-  onChange={(e) => setPriceSort(e.target.value)}
-  style={{
-    padding: "10px 12px",
-    border: "1px solid #ccc",
-    borderRadius: 10,
-    fontSize: 14
-  }}
->
-  <option value="default">Сортировка цены</option>
-  <option value="asc">Цена: по возрастанию</option>
-  <option value="desc">Цена: по убыванию</option>
-</select>
+        <select
+          value={priceSort}
+          onChange={(e) => setPriceSort(e.target.value)}
+          style={{
+            padding: "10px 12px",
+            border: "1px solid #ccc",
+            borderRadius: 10,
+            fontSize: 14
+          }}
+        >
+          <option value="default">Сортировка цены</option>
+          <option value="asc">Цена: по возрастанию</option>
+          <option value="desc">Цена: по убыванию</option>
+        </select>
 
-  
         <button
-          onClick={runSearch}
+          onClick={() => runSearch(true)}
           disabled={!canSearch || loading}
           style={{
             padding: "10px 14px",
@@ -221,7 +261,7 @@ export default function Page() {
         </button>
 
         <div style={{ color: "#666", fontSize: 13 }}>
-          {rows.length > 0 ? `Найдено: ${rows.length} ` : " "}
+          {rows.length > 0 ? `Загружено: ${rows.length}` : " "}
         </div>
       </div>
 
@@ -363,7 +403,7 @@ export default function Page() {
               <tr>
                 <td colSpan={6} style={{ padding: "14px 8px", color: "#666" }}>
                   {canSearch
-                    ? "Ничего не найдено."
+                    ? (loading ? "Идёт поиск..." : "Ничего не найдено.")
                     : "Начни вводить запрос (минимум 2 символа) или выбери бренд."}
                 </td>
               </tr>
@@ -371,27 +411,48 @@ export default function Page() {
           </tbody>
         </table>
       </div>
-            {showScrollTop && (
-  <button
-    onClick={scrollToTop}
-    style={{
-      position: "fixed",
-      right: 24,
-      bottom: 24,
-      zIndex: 1000,
-      padding: "12px 16px",
-      borderRadius: 999,
-      border: "1px solid #111",
-      background: "#111",
-      color: "#fff",
-      cursor: "pointer",
-      fontSize: 14,
-      boxShadow: "0 8px 24px rgba(0,0,0,0.18)"
-    }}
-  >
-    В начало списка
-  </button>
-)}
+
+      {rows.length > 0 && hasMore && (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 20 }}>
+          <button
+            onClick={() => runSearch(false)}
+            disabled={loadingMore}
+            style={{
+              padding: "12px 18px",
+              borderRadius: 12,
+              border: "1px solid #111",
+              background: loadingMore ? "#ddd" : "#fff",
+              color: "#111",
+              cursor: loadingMore ? "default" : "pointer",
+              fontSize: 14
+            }}
+          >
+            {loadingMore ? "Загружаю..." : "Показать ещё"}
+          </button>
+        </div>
+      )}
+
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          style={{
+            position: "fixed",
+            right: 24,
+            bottom: 24,
+            zIndex: 1000,
+            padding: "12px 16px",
+            borderRadius: 999,
+            border: "1px solid #111",
+            background: "#111",
+            color: "#fff",
+            cursor: "pointer",
+            fontSize: 14,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.18)"
+          }}
+        >
+          В начало списка
+        </button>
+      )}
     </div>
   );
 }
