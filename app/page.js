@@ -331,16 +331,78 @@ export default function Page() {
     setCart([]);
   }
 
-  function handleSubmitOrder() {
-    if (cart.length === 0) {
-      alert("Добавь хотя бы один товар в заявку.");
+  async function handleSubmitOrder() {
+  if (cart.length === 0) {
+    alert("Добавь хотя бы один товар в заявку.");
+    return;
+  }
+
+  if (!customerName.trim() || !customerContact.trim()) {
+    alert("Заполни имя и контакт.");
+    return;
+  }
+
+  const {
+    data: { session }
+  } = await supabase.auth.getSession();
+
+  if (!session?.user) {
+    alert("Чтобы сохранить заявку в личный кабинет, сначала войди в аккаунт.");
+    window.location.href = "/login";
+    return;
+  }
+
+  try {
+    const { data: orderData, error: orderError } = await supabase
+      .from("orders")
+      .insert({
+        user_id: session.user.id,
+        customer_name: customerName.trim(),
+        customer_contact: customerContact.trim(),
+        customer_comment: customerComment.trim(),
+        status: "new"
+      })
+      .select("id")
+      .single();
+
+    if (orderError) {
+      alert("Ошибка при создании заявки: " + orderError.message);
       return;
     }
 
-    if (!customerName.trim() || !customerContact.trim()) {
-      alert("Заполни имя и контакт.");
+    const orderId = orderData.id;
+
+    const itemsPayload = cart.map((item) => ({
+      order_id: orderId,
+      brand: item.brand,
+      pn: item.pn,
+      name: item.name,
+      order_qty: item.orderQty,
+      stock_qty: item.stockQty,
+      display_price: item.displayPrice,
+      price_byn:
+        typeof item.price_byn === "number" ? item.price_byn : null
+    }));
+
+    const { error: itemsError } = await supabase
+      .from("order_items")
+      .insert(itemsPayload);
+
+    if (itemsError) {
+      alert("Заявка создана, но товары не сохранились: " + itemsError.message);
       return;
     }
+
+    alert(`Заявка #${orderId} сохранена в личный кабинет.`);
+
+    setCart([]);
+    setCustomerComment("");
+    setOrderOpen(false);
+  } catch (e) {
+    console.error(e);
+    alert("Что-то пошло не так при сохранении заявки.");
+  }
+}
 
     const payload = {
       customer_name: customerName.trim(),
