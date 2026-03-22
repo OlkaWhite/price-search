@@ -1,5 +1,9 @@
 import "./globals.css";
 import Header from "../components/Header";
+export const metadata = {
+  title: "b2bpart.ru",
+  description: "Поиск по прайсам"
+};
 
 export default function RootLayout({ children }) {
   return (
