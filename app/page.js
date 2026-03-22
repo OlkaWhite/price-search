@@ -520,7 +520,7 @@ async function handleSubmitOrder() {
         </a>
       </div>
 
-      //<h1 style={{ margin: 0, fontSize: 28 }}>Поиск по прайсам</h1>
+
 
       <p style={{ marginTop: 8, color: "#666", fontSize: 15 }}>
         Вводи минимум 2 символа. Ищет по <b>P/N</b> и по <b>наименованию</b>.
