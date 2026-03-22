@@ -22,45 +22,61 @@ export default function AccountPage() {
   const [orders, setOrders] = useState([]);
 
   useEffect(() => {
-    let mounted = true;
+  let mounted = true;
 
-    (async () => {
+  async function loadAccount() {
+    try {
       setLoading(true);
       setErrorText("");
 
       const {
-        data: { session }
-      } = await supabase.auth.getSession();
+        data: { user },
+        error: userError
+      } = await supabase.auth.getUser();
 
-      if (!session?.user) {
+      if (userError) {
+        throw userError;
+      }
+
+      if (!user) {
         router.replace("/login");
         return;
       }
 
       if (!mounted) return;
 
-      setSessionUser(session.user);
-      setEmail(session.user.email || "");
+      setSessionUser(user);
+      setEmail(user.email || "");
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", session.user.id)
+        .eq("id", user.id)
         .maybeSingle();
 
       if (profileError) {
-        setErrorText(profileError.message);
-      } else if (profile) {
+        throw profileError;
+      }
+
+      if (!mounted) return;
+
+      if (profile) {
         setCompanyName(profile.company_name || "");
         setContactName(profile.contact_name || "");
         setPhone(profile.phone || "");
         setTelegram(profile.telegram || "");
-        setEmail(profile.email || session.user.email || "");
+        setEmail(profile.email || user.email || "");
       } else {
-        await supabase.from("profiles").insert({
-          id: session.user.id,
-          email: session.user.email || ""
-        });
+        const { error: insertProfileError } = await supabase
+          .from("profiles")
+          .insert({
+            id: user.id,
+            email: user.email || ""
+          });
+
+        if (insertProfileError) {
+          throw insertProfileError;
+        }
       }
 
       const { data: ordersData, error: ordersError } = await supabase
@@ -86,20 +102,29 @@ export default function AccountPage() {
         .order("created_at", { ascending: false });
 
       if (ordersError) {
-        setErrorText(ordersError.message);
-      } else {
-        setOrders(ordersData || []);
+        throw ordersError;
       }
 
+      if (!mounted) return;
+
+      setOrders(ordersData || []);
+    } catch (err) {
+      console.error("Account load error:", err);
+      if (!mounted) return;
+      setErrorText(err?.message || "Не удалось загрузить кабинет.");
+    } finally {
       if (mounted) {
         setLoading(false);
       }
-    })();
+    }
+  }
 
-    return () => {
-      mounted = false;
-    };
-  }, [router]);
+  loadAccount();
+
+  return () => {
+    mounted = false;
+  };
+}, [router]);
 
   async function handleSaveProfile(e) {
     e.preventDefault();
