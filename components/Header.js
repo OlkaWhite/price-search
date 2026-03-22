@@ -69,18 +69,49 @@ export default function Header() {
           flexWrap: "wrap"
         }}
       >
-        <Link
-          href="/"
-          style={{
-            textDecoration: "none",
-            color: "#111",
-            fontSize: 22,
-            fontWeight: 700,
-            whiteSpace: "nowrap"
-          }}
-        >
-          b2bpart.ru
-        </Link>
+        <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap"
+  }}
+>
+  <Link
+    href="/"
+    style={{
+      textDecoration: "none",
+      color: "#111",
+      fontSize: 22,
+      fontWeight: 700,
+      whiteSpace: "nowrap"
+    }}
+  >
+    b2bpart.ru
+  </Link>
+
+  <a
+    href="https://t.me/OlkaWhite"
+    target="_blank"
+    rel="noopener noreferrer"
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "10px 12px",
+      border: "1px solid #ccc",
+      borderRadius: 10,
+      fontSize: 14,
+      color: "#111",
+      textDecoration: "none",
+      background: "#fff",
+      whiteSpace: "nowrap"
+    }}
+  >
+    <span style={{ fontSize: 15 }}>✈️</span>
+    <span>Связаться с разработчиком</span>
+  </a>
+</div>
 
         <div
           style={{
