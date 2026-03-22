@@ -428,7 +428,7 @@ const [profileLoaded, setProfileLoaded] = useState(false);
     return;
   }
 
-  if (!sessionUser && (!customerName.trim() || !customerContact.trim())) {
+  if (!customerName.trim() || !customerContact.trim()) {
   alert("Заполни имя и контакт.");
   return;
 }
