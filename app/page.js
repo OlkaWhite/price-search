@@ -429,7 +429,7 @@ const [profileLoaded, setProfileLoaded] = useState(false);
   }
 
   if (!customerName.trim() || !customerContact.trim()) {
-  alert("Заполни имя и контакт.");
+  alert("Заполни имя и контакт в личном кабинете!");
   return;
 }
 
