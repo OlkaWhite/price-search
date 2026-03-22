@@ -36,6 +36,100 @@ export default function Page() {
   const [customerContact, setCustomerContact] = useState("");
   const [customerComment, setCustomerComment] = useState("");
 
+  const [sessionUser, setSessionUser] = useState(null);
+const [profileLoaded, setProfileLoaded] = useState(false);
+
+  useEffect(() => {
+  let mounted = true;
+
+  async function loadUserProfile() {
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+
+    if (!mounted) return;
+
+    if (!session?.user) {
+      setSessionUser(null);
+      setProfileLoaded(true);
+      return;
+    }
+
+    setSessionUser(session.user);
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("contact_name, phone, telegram, email")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (!mounted) return;
+
+    if (profile) {
+      if (profile.contact_name) setCustomerName(profile.contact_name);
+      if (profile.phone) {
+        setCustomerContact(profile.phone);
+      } else if (profile.telegram) {
+        setCustomerContact(profile.telegram);
+      } else if (profile.email) {
+        setCustomerContact(profile.email);
+      } else if (session.user.email) {
+        setCustomerContact(session.user.email);
+      }
+    } else if (session.user.email) {
+      setCustomerContact(session.user.email);
+    }
+
+    setProfileLoaded(true);
+  }
+
+  loadUserProfile();
+
+  const {
+    data: { subscription }
+  } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    if (!mounted) return;
+
+    if (!session?.user) {
+      setSessionUser(null);
+      setProfileLoaded(true);
+      return;
+    }
+
+    setSessionUser(session.user);
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("contact_name, phone, telegram, email")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (!mounted) return;
+
+    if (profile) {
+      if (profile.contact_name) setCustomerName(profile.contact_name);
+      if (profile.phone) {
+        setCustomerContact(profile.phone);
+      } else if (profile.telegram) {
+        setCustomerContact(profile.telegram);
+      } else if (profile.email) {
+        setCustomerContact(profile.email);
+      } else if (session.user.email) {
+        setCustomerContact(session.user.email);
+      }
+    } else if (session.user.email) {
+      setCustomerContact(session.user.email);
+    }
+
+    setProfileLoaded(true);
+  });
+
+  return () => {
+    mounted = false;
+    subscription.unsubscribe();
+  };
+}, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -337,10 +431,10 @@ export default function Page() {
     return;
   }
 
-  if (!customerName.trim() || !customerContact.trim()) {
-    alert("Заполни имя и контакт.");
-    return;
-  }
+  if (!sessionUser && (!customerName.trim() || !customerContact.trim())) {
+  alert("Заполни имя и контакт.");
+  return;
+}
 
   const {
     data: { session }
@@ -935,31 +1029,50 @@ async function handleSubmitOrder() {
           </div>
 
           <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-            <input
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Ваше имя"
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                border: "1px solid #ccc",
-                borderRadius: 10,
-                fontSize: 14
-              }}
-            />
+            {sessionUser ? (
+  <div
+    style={{
+      padding: "10px 12px",
+      border: "1px solid #e5e5e5",
+      borderRadius: 10,
+      background: "#fafafa",
+      fontSize: 14,
+      color: "#444"
+    }}
+  >
+    Заявка будет отправлена от аккаунта{" "}
+    <b>{customerName || sessionUser.email || "клиента"}</b>
+    {customerContact ? <> · {customerContact}</> : null}
+  </div>
+) : (
+  <>
+    <input
+      value={customerName}
+      onChange={(e) => setCustomerName(e.target.value)}
+      placeholder="Ваше имя"
+      style={{
+        width: "100%",
+        padding: "10px 12px",
+        border: "1px solid #ccc",
+        borderRadius: 10,
+        fontSize: 14
+      }}
+    />
 
-            <input
-              value={customerContact}
-              onChange={(e) => setCustomerContact(e.target.value)}
-              placeholder="Телефон или Telegram"
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                border: "1px solid #ccc",
-                borderRadius: 10,
-                fontSize: 14
-              }}
-            />
+    <input
+      value={customerContact}
+      onChange={(e) => setCustomerContact(e.target.value)}
+      placeholder="Телефон или Telegram"
+      style={{
+        width: "100%",
+        padding: "10px 12px",
+        border: "1px solid #ccc",
+        borderRadius: 10,
+        fontSize: 14
+      }}
+    />
+  </>
+)}
 
             <textarea
               value={customerComment}
