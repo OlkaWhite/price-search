@@ -9,6 +9,8 @@ const supabase = createClient(
 );
 
 const PAGE_SIZE = 100;
+const CART_STORAGE_KEY = "b2bpart_cart_v1";
+const FORM_STORAGE_KEY = "b2bpart_order_form_v1";
 
 export default function Page() {
   const [query, setQuery] = useState("");
@@ -27,6 +29,12 @@ export default function Page() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+
+  const [cart, setCart] = useState([]);
+  const [orderOpen, setOrderOpen] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [customerContact, setCustomerContact] = useState("");
+  const [customerComment, setCustomerComment] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +62,49 @@ export default function Page() {
     };
   }, []);
 
+  useEffect(() => {
+    try {
+      const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+      const savedForm = localStorage.getItem(FORM_STORAGE_KEY);
+
+      if (savedCart) {
+        setCart(JSON.parse(savedCart));
+      }
+
+      if (savedForm) {
+        const parsed = JSON.parse(savedForm);
+        setCustomerName(parsed.customerName || "");
+        setCustomerContact(parsed.customerContact || "");
+        setCustomerComment(parsed.customerComment || "");
+      }
+    } catch (e) {
+      console.error("Failed to restore local state", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch (e) {
+      console.error("Failed to save cart", e);
+    }
+  }, [cart]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        FORM_STORAGE_KEY,
+        JSON.stringify({
+          customerName,
+          customerContact,
+          customerComment
+        })
+      );
+    } catch (e) {
+      console.error("Failed to save order form", e);
+    }
+  }, [customerName, customerContact, customerComment]);
+
   const canSearch = useMemo(
     () => query.trim().length >= 2 || brand !== "ALL",
     [query, brand]
@@ -63,13 +114,18 @@ export default function Page() {
     return canSearch ? searchBrands : brands;
   }, [canSearch, searchBrands, brands]);
 
+  const cartCount = useMemo(
+    () => cart.reduce((sum, item) => sum + item.orderQty, 0),
+    [cart]
+  );
+
   function buildRowsQuery() {
     const q = query.trim();
     const pattern = `%${q}%`;
 
     let req = supabase
       .from("offers_view")
-      .select("brand,pn,name,qty,price_byn,price_rub,supplier,pricelist_name");
+      .select("id,brand,pn,name,qty,price_byn,price_rub,price_usd,supplier,pricelist_name");
 
     if (q) {
       req = req.or(`pn.ilike.${pattern},name.ilike.${pattern}`);
@@ -207,50 +263,148 @@ export default function Page() {
     });
   }
 
+  function getRowKey(r) {
+    return `${r.brand || ""}__${r.pn || ""}__${r.name || ""}`;
+  }
+
+  function getDisplayPrice(r) {
+    if (typeof r.price_byn === "number") return `${r.price_byn.toFixed(2)} BYN`;
+    if (r.price_rub && String(r.price_rub).trim() !== "") return String(r.price_rub);
+    if (r.price_usd && String(r.price_usd).trim() !== "") return String(r.price_usd);
+    return "";
+  }
+
+  function isInCart(r) {
+    const key = getRowKey(r);
+    return cart.some((item) => item.key === key);
+  }
+
+  function addToCart(r) {
+    const key = getRowKey(r);
+
+    setCart((prev) => {
+      const existing = prev.find((item) => item.key === key);
+
+      if (existing) {
+        return prev.map((item) =>
+          item.key === key
+            ? { ...item, orderQty: item.orderQty + 1 }
+            : item
+        );
+      }
+
+      return [
+        ...prev,
+        {
+          key,
+          brand: r.brand,
+          pn: r.pn,
+          name: r.name,
+          stockQty: r.qty ?? "",
+          price_byn: r.price_byn ?? null,
+          displayPrice: getDisplayPrice(r),
+          orderQty: 1
+        }
+      ];
+    });
+
+    setOrderOpen(true);
+  }
+
+  function removeFromCart(key) {
+    setCart((prev) => prev.filter((item) => item.key !== key));
+  }
+
+  function changeCartQty(key, direction) {
+    setCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.key !== key) return item;
+          const nextQty = direction === "inc" ? item.orderQty + 1 : item.orderQty - 1;
+          return { ...item, orderQty: nextQty };
+        })
+        .filter((item) => item.orderQty > 0)
+    );
+  }
+
+  function clearCart() {
+    setCart([]);
+  }
+
+  function handleSubmitOrder() {
+    if (cart.length === 0) {
+      alert("Добавь хотя бы один товар в заявку.");
+      return;
+    }
+
+    if (!customerName.trim() || !customerContact.trim()) {
+      alert("Заполни имя и контакт.");
+      return;
+    }
+
+    const payload = {
+      customer_name: customerName.trim(),
+      customer_contact: customerContact.trim(),
+      customer_comment: customerComment.trim(),
+      items: cart.map((item) => ({
+        brand: item.brand,
+        pn: item.pn,
+        name: item.name,
+        order_qty: item.orderQty,
+        stock_qty: item.stockQty,
+        price_byn: item.price_byn,
+        display_price: item.displayPrice
+      }))
+    };
+
+    alert(
+      "Заявка собрана.\n\n" +
+        JSON.stringify(payload, null, 2) +
+        "\n\nСледующим шагом подключим отправку в n8n / Telegram."
+    );
+  }
+
   return (
     <div
       style={{
         width: "98vw",
         maxWidth: 2240,
         margin: "0 auto",
-        padding: "20px 16px"
+        padding: "20px 16px 120px"
       }}
     >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginTop: 10,
+          marginBottom: -4
+        }}
+      >
+        <a
+          href="https://t.me/OlkaWhite"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 12px",
+            border: "1px solid #ccc",
+            borderRadius: 10,
+            fontSize: 14,
+            color: "#111",
+            textDecoration: "none",
+            background: "#fff",
+            whiteSpace: "nowrap"
+          }}
+        >
+          <span style={{ fontSize: 15 }}>✈️</span>
+          <span>Связаться с разработчиком</span>
+        </a>
+      </div>
 
-  
-      
       <h1 style={{ margin: 0, fontSize: 28 }}>Поиск по прайсам</h1>
-      
-       <div
-  style={{
-    display: "flex",
-    justifyContent: "flex-end",
-    marginTop: -35,
-    marginBottom: -4
-  }}
->
-  <a
-    href="https://t.me/OlkaWhite"
-    target="_blank"
-    rel="noopener noreferrer"
-    style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "10px 12px",
-      border: "1px solid #ccc",
-      borderRadius: 10,
-      fontSize: 14,
-      color: "#111",
-      textDecoration: "none",
-      background: "#fff",
-      whiteSpace: "nowrap"
-    }}
-  >
-    <span style={{ fontSize: 15 }}>✈️</span>
-    <span>Связаться с разработчиком</span>
-  </a>
-</div>
 
       <p style={{ marginTop: 8, color: "#666", fontSize: 15 }}>
         Вводи минимум 2 символа. Ищет по <b>P/N</b> и по <b>наименованию</b>.
@@ -270,7 +424,7 @@ export default function Page() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Поиск: парт-номер или текст…"
+          placeholder="Поиск: парт-номер или текст..."
           style={{
             width: 420,
             maxWidth: "100%",
@@ -280,8 +434,6 @@ export default function Page() {
             fontSize: 14
           }}
         />
-
-            
 
         <select
           value={brand}
@@ -343,8 +495,6 @@ export default function Page() {
         )}
       </div>
 
-
-
       {errorText && (
         <div
           style={{
@@ -374,12 +524,12 @@ export default function Page() {
             <col style={{ width: "auto" }} />
             <col style={{ width: "80px" }} />
             <col style={{ width: "120px" }} />
-            <col style={{ width: "180px" }} />
+            <col style={{ width: "130px" }} />
           </colgroup>
 
           <thead>
             <tr>
-              {["Бренд", "P/N", "Наименование", "Кол-во", "Цена (BYN)", "Поставщик/прайс"].map((h) => (
+              {["Бренд", "P/N", "Наименование", "Кол-во", "Цена (BYN)", "Заказать"].map((h) => (
                 <th
                   key={h}
                   style={{
@@ -397,87 +547,104 @@ export default function Page() {
           </thead>
 
           <tbody>
-            {rows.map((r, idx) => (
-              <tr key={`${r.brand}-${r.pn}-${r.price_byn}-${idx}`}>
-                <td
-                  style={{
-                    padding: "8px",
-                    borderBottom: "1px solid #eee",
-                    whiteSpace: "nowrap",
-                    verticalAlign: "top"
-                  }}
-                >
-                  {r.brand}
-                </td>
+            {rows.map((r, idx) => {
+              const added = isInCart(r);
 
-                <td
-                  style={{
-                    padding: "8px",
-                    borderBottom: "1px solid #eee",
-                    whiteSpace: "normal",
-                    overflowWrap: "anywhere",
-                    wordBreak: "break-word",
-                    verticalAlign: "top"
-                  }}
-                >
-                  {r.pn}
-                </td>
+              return (
+                <tr key={`${r.brand}-${r.pn}-${r.price_byn}-${idx}`}>
+                  <td
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #eee",
+                      whiteSpace: "nowrap",
+                      verticalAlign: "top"
+                    }}
+                  >
+                    {r.brand}
+                  </td>
 
-                <td
-                  style={{
-                    padding: "8px",
-                    borderBottom: "1px solid #eee",
-                    whiteSpace: "normal",
-                    overflowWrap: "anywhere",
-                    wordBreak: "break-word",
-                    lineHeight: 1.35,
-                    verticalAlign: "top"
-                  }}
-                >
-                  {r.name}
-                </td>
+                  <td
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #eee",
+                      whiteSpace: "normal",
+                      overflowWrap: "anywhere",
+                      wordBreak: "break-word",
+                      verticalAlign: "top"
+                    }}
+                  >
+                    {r.pn}
+                  </td>
 
-                <td
-                  style={{
-                    padding: "8px",
-                    borderBottom: "1px solid #eee",
-                    whiteSpace: "nowrap",
-                    textAlign: "center",
-                    verticalAlign: "top"
-                  }}
-                >
-                  {r.qty ?? ""}
-                </td>
+                  <td
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #eee",
+                      whiteSpace: "normal",
+                      overflowWrap: "anywhere",
+                      wordBreak: "break-word",
+                      lineHeight: 1.35,
+                      verticalAlign: "top"
+                    }}
+                  >
+                    {r.name}
+                  </td>
 
-                <td
-                  style={{
-                    padding: "8px",
-                    borderBottom: "1px solid #eee",
-                    whiteSpace: "nowrap",
-                    verticalAlign: "top"
-                  }}
-                >
-                  {typeof r.price_byn === "number"
-                    ? r.price_byn.toFixed(2)
-                    : (r.price_rub && String(r.price_rub).trim() !== ""
-                        ? r.price_rub
-                        : "")}
-                </td>
+                  <td
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #eee",
+                      whiteSpace: "nowrap",
+                      textAlign: "center",
+                      verticalAlign: "top"
+                    }}
+                  >
+                    {r.qty ?? ""}
+                  </td>
 
-                <td
-                  style={{
-                    padding: "8px",
-                    borderBottom: "1px solid #eee",
-                    whiteSpace: "normal",
-                    overflowWrap: "break-word",
-                    wordBreak: "break-word",
-                    verticalAlign: "top"
-                  }}
-                >
-                  {r.supplier} / {r.pricelist_name}
-                </td>
-              </tr>
-            ))}
+                  <td
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #eee",
+                      whiteSpace: "nowrap",
+                      verticalAlign: "top"
+                    }}
+                  >
+                    {typeof r.price_byn === "number"
+                      ? r.price_byn.toFixed(2)
+                      : (r.price_rub && String(r.price_rub).trim() !== ""
+                          ? r.price_rub
+                          : (r.price_usd && String(r.price_usd).trim() !== ""
+                              ? r.price_usd
+                              : ""))}
+                  </td>
+
+                  <td
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #eee",
+                      verticalAlign: "top"
+                    }}
+                  >
+                    <button
+                      onClick={() => addToCart(r)}
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: added ? "1px solid #ccc" : "1px solid #111",
+                        background: added ? "#f3f3f3" : "#111",
+                        color: added ? "#111" : "#fff",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        width: "100%"
+                      }}
+                    >
+                      {added ? "Добавлено" : "В заказ"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
 
             {rows.length === 0 && (
               <tr>
@@ -512,13 +679,35 @@ export default function Page() {
         </div>
       )}
 
+      {cart.length > 0 && (
+        <button
+          onClick={() => setOrderOpen((v) => !v)}
+          style={{
+            position: "fixed",
+            right: 24,
+            bottom: showScrollTop ? 84 : 24,
+            zIndex: 1000,
+            padding: "12px 16px",
+            borderRadius: 999,
+            border: "1px solid #111",
+            background: "#111",
+            color: "#fff",
+            cursor: "pointer",
+            fontSize: 14,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.18)"
+          }}
+        >
+          {orderOpen ? `Скрыть заявку (${cartCount})` : `Заявка (${cartCount})`}
+        </button>
+      )}
+
       {showScrollTop && (
         <button
           onClick={scrollToTop}
           style={{
             position: "fixed",
             right: 24,
-            bottom: 24,
+            bottom: cart.length > 0 ? (orderOpen ? 500 : 84) : 24,
             zIndex: 1000,
             padding: "12px 16px",
             borderRadius: 999,
@@ -532,6 +721,190 @@ export default function Page() {
         >
           В начало списка
         </button>
+      )}
+
+      {orderOpen && (
+        <div
+          style={{
+            position: "fixed",
+            right: 24,
+            bottom: 24,
+            width: 420,
+            maxWidth: "calc(100vw - 32px)",
+            maxHeight: "80vh",
+            overflow: "auto",
+            zIndex: 999,
+            background: "#fff",
+            border: "1px solid #ddd",
+            borderRadius: 16,
+            boxShadow: "0 14px 34px rgba(0,0,0,0.18)",
+            padding: 16
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 12
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 18 }}>Заявка</h3>
+
+            <button
+              onClick={clearCart}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#777",
+                cursor: "pointer",
+                fontSize: 13
+              }}
+            >
+              Очистить
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gap: 10 }}>
+            {cart.map((item) => (
+              <div
+                key={item.key}
+                style={{
+                  border: "1px solid #eee",
+                  borderRadius: 12,
+                  padding: 10
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                  {item.brand} {item.pn}
+                </div>
+
+                <div style={{ fontSize: 13, color: "#444", marginBottom: 8, lineHeight: 1.35 }}>
+                  {item.name}
+                </div>
+
+                <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>
+                  Цена: {item.displayPrice || "—"}
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 10
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button
+                      onClick={() => changeCartQty(item.key, "dec")}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        border: "1px solid #ccc",
+                        background: "#fff",
+                        cursor: "pointer"
+                      }}
+                    >
+                      −
+                    </button>
+
+                    <div style={{ minWidth: 22, textAlign: "center", fontSize: 14 }}>
+                      {item.orderQty}
+                    </div>
+
+                    <button
+                      onClick={() => changeCartQty(item.key, "inc")}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        border: "1px solid #ccc",
+                        background: "#fff",
+                        cursor: "pointer"
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => removeFromCart(item.key)}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      color: "#a00",
+                      cursor: "pointer",
+                      fontSize: 13
+                    }}
+                  >
+                    Удалить
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+            <input
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Ваше имя"
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                border: "1px solid #ccc",
+                borderRadius: 10,
+                fontSize: 14
+              }}
+            />
+
+            <input
+              value={customerContact}
+              onChange={(e) => setCustomerContact(e.target.value)}
+              placeholder="Телефон или Telegram"
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                border: "1px solid #ccc",
+                borderRadius: 10,
+                fontSize: 14
+              }}
+            />
+
+            <textarea
+              value={customerComment}
+              onChange={(e) => setCustomerComment(e.target.value)}
+              placeholder="Комментарий к заказу"
+              rows={4}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                border: "1px solid #ccc",
+                borderRadius: 10,
+                fontSize: 14,
+                resize: "vertical"
+              }}
+            />
+
+            <button
+              onClick={handleSubmitOrder}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: "1px solid #111",
+                background: "#111",
+                color: "#fff",
+                cursor: "pointer",
+                fontSize: 14
+              }}
+            >
+              Отправить заявку
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
