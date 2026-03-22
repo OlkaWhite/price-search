@@ -343,7 +343,25 @@ export default function AccountPage() {
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 700 }}>Заявка #{order.id}</div>
+                      <div style={{ fontWeight: 700 }}>
+  Заявка #{order.id} —{" "}
+  {(
+    (order.order_items || []).reduce((sum, item) => {
+      const price =
+        typeof item.price_byn === "number"
+          ? item.price_byn
+          : Number(item.price_byn) || 0;
+
+      const qty =
+        typeof item.order_qty === "number"
+          ? item.order_qty
+          : Number(item.order_qty) || 0;
+
+      return sum + price * qty;
+    }, 0)
+  ).toFixed(2)}{" "}
+  BYN
+</div>
                       <div style={{ color: "#666", fontSize: 13 }}>
                         {new Date(order.created_at).toLocaleString()}
                       </div>
