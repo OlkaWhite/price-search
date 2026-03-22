@@ -108,7 +108,7 @@ export default function Header() {
       whiteSpace: "nowrap"
     }}
   >
-    <span style={{ fontSize: 15 }}>✈️</span>
+    <span style={{ fontSize: 10}}>✈️</span>
     <span>Связаться с разработчиком</span>
   </a>
 </div>
