@@ -240,37 +240,34 @@ const [profileLoaded, setProfileLoaded] = useState(false);
     return req;
   }
 
-  async function loadSearchBrands() {
-    if (!canSearch) {
-      setSearchBrands([]);
-      return;
-    }
+ async function loadSearchBrands() {
+  if (!canSearch) {
+    setSearchBrands([]);
+    setLoadingBrands(false);
+    return;
+  }
 
-    setLoadingBrands(true);
+  setLoadingBrands(true);
 
-    const q = query.trim();
-    const pattern = `%${q}%`;
+  try {
+    const q = query.trim() || null;
 
-    let req = supabase
-      .from("offers_view")
-      .select("brand");
+    const { data, error } = await supabase.rpc("search_distinct_brands", {
+      search_text: q
+    });
 
-    if (q) {
-      req = req.or(`pn.ilike.${pattern},name.ilike.${pattern}`);
-    }
-
-    const { data, error } = await req;
-
-    if (!error) {
-      const uniq = Array.from(
-        new Set((data || []).map((x) => x.brand).filter(Boolean))
-      ).sort();
-
+    if (error) {
+      console.error("Brands load error:", error);
+    } else {
+      const uniq = (data || []).map((x) => x.brand).filter(Boolean);
       setSearchBrands(uniq);
     }
-
+  } catch (e) {
+    console.error("Brands load failed:", e);
+  } finally {
     setLoadingBrands(false);
   }
+}
 
   async function runSearch(reset = true) {
     const nextPage = reset ? 0 : page + 1;
@@ -328,13 +325,19 @@ const [profileLoaded, setProfileLoaded] = useState(false);
   }, [query, brand, priceSort]);
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      loadSearchBrands();
-    }, 350);
+  if (!canSearch) {
+    setSearchBrands([]);
+    setLoadingBrands(false);
+    return;
+  }
 
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+  const t = setTimeout(() => {
+    loadSearchBrands();
+  }, 600);
+
+  return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [query]);
 
   useEffect(() => {
     function handleScroll() {
