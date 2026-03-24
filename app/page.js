@@ -332,10 +332,16 @@ setLoadingMore(false);
 }
 
 async function handleSearchClick() {
-if (!canSearch) return;
+  if (!canSearch) return;
 
-await runSearch(true);
-  loadSearchBrands();
+  const foundCount = await runSearch(true);
+
+  if (foundCount > 0) {
+    loadSearchBrands();
+  } else {
+    setSearchBrands([]);
+    setLoadingBrands(false);
+  }
 }
 
 function scrollToTop() {
