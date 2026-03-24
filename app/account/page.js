@@ -17,6 +17,7 @@ const [orders, setOrders] = useState([]);
 
 const [loading, setLoading] = useState(true);
 const [savingProfile, setSavingProfile] = useState(false);
+const [savingOrderId, setSavingOrderId] = useState(null);
 const [errorText, setErrorText] = useState("");
 const [message, setMessage] = useState("");
 
@@ -84,8 +85,16 @@ if (ordersError) throw ordersError;
 
 if (!mounted) return;
 
+const normalizedOrders = (ordersData || []).map((order) => ({
+...order,
+order_items: (order.order_items || []).map((item) => ({
+...item,
+order_qty: Number(item.order_qty) || 1
+}))
+}));
+
 setProfile(profileData || null);
-setOrders(ordersData || []);
+setOrders(normalizedOrders);
 
 setCompanyName(profileData?.company_name || "");
 setContactName(profileData?.contact_name || "");
@@ -136,7 +145,7 @@ const { error } = await supabase.from("profiles").upsert(payload);
 
 if (error) throw error;
 
-setMessage("Данные сохранены.");
+setMessage("Данные профиля сохранены.");
 } catch (err) {
 console.error("Profile save error:", err);
 setErrorText(err?.message || "Не удалось сохранить данные.");
@@ -148,6 +157,90 @@ setSavingProfile(false);
 async function handleLogout() {
 await supabase.auth.signOut();
 window.location.href = "/";
+}
+
+function changeItemQty(orderId, itemId, nextValue) {
+const qty = Math.max(1, Number(nextValue) || 1);
+
+setOrders((prev) =>
+prev.map((order) =>
+order.id !== orderId
+? order
+: {
+...order,
+order_items: (order.order_items || []).map((item) =>
+item.id !== itemId ? item : { ...item, order_qty: qty }
+)
+}
+)
+);
+}
+
+function removeItemFromOrder(orderId, itemId) {
+setOrders((prev) =>
+prev.map((order) =>
+order.id !== orderId
+? order
+: {
+...order,
+order_items: (order.order_items || []).filter((item) => item.id !== itemId)
+}
+)
+);
+}
+
+async function handleSaveOrder(order) {
+try {
+setSavingOrderId(order.id);
+setErrorText("");
+setMessage("");
+
+const currentItems = order.order_items || [];
+
+const { data: dbItems, error: readError } = await supabase
+.from("order_items")
+.select("id")
+.eq("order_id", order.id);
+
+if (readError) throw readError;
+
+const dbIds = (dbItems || []).map((x) => x.id);
+const currentIds = currentItems.map((x) => x.id);
+const idsToDelete = dbIds.filter((id) => !currentIds.includes(id));
+
+for (const item of currentItems) {
+const { error: updateError } = await supabase
+.from("order_items")
+.update({
+order_qty: Number(item.order_qty) || 1
+})
+.eq("id", item.id)
+.eq("order_id", order.id);
+
+if (updateError) throw updateError;
+}
+
+if (idsToDelete.length > 0) {
+const { error: deleteError } = await supabase
+.from("order_items")
+.delete()
+.in("id", idsToDelete);
+
+if (deleteError) throw deleteError;
+}
+
+setMessage(`Заявка #${order.id} сохранена.`);
+
+const refreshedOrders = orders.map((o) =>
+o.id === order.id ? { ...o, order_items: currentItems } : o
+);
+setOrders(refreshedOrders);
+} catch (err) {
+console.error("Order save error:", err);
+setErrorText(err?.message || "Не удалось сохранить заявку.");
+} finally {
+setSavingOrderId(null);
+}
 }
 
 if (loading) {
@@ -213,8 +306,7 @@ color: "#9b1c1c"
 </div>
 )}
 
-<div style={mainGridStyle}>
-<div style={{ display: "grid", gap: 20, alignSelf: "start" }}>
+<div style={topGridStyle}>
 <div style={cardStyle}>
 <h2 style={{ marginTop: 0, marginBottom: 18 }}>Профиль</h2>
 
@@ -284,6 +376,7 @@ value={`${ordersStats.totalAmount.toFixed(2)} BYN`}
 </div>
 </div>
 
+<div style={{ marginTop: 24 }}>
 <div style={cardStyle}>
 <h2 style={{ marginTop: 0, marginBottom: 18 }}>Мои заявки</h2>
 
@@ -366,7 +459,32 @@ fontSize: 14
 ) : null}
 
 <div style={{ marginTop: 16 }}>
-<div style={{ fontWeight: 700, marginBottom: 10 }}>Позиции</div>
+<div
+style={{
+display: "flex",
+justifyContent: "space-between",
+alignItems: "center",
+gap: 12,
+flexWrap: "wrap",
+marginBottom: 10
+}}
+>
+<div style={{ fontWeight: 700 }}>Позиции</div>
+
+<button
+onClick={() => handleSaveOrder(order)}
+disabled={savingOrderId === order.id}
+style={{
+...primaryButtonStyle,
+padding: "10px 12px",
+background: savingOrderId === order.id ? "#ddd" : "#111",
+color: savingOrderId === order.id ? "#333" : "#fff",
+cursor: savingOrderId === order.id ? "default" : "pointer"
+}}
+>
+{savingOrderId === order.id ? "Сохраняю..." : "Сохранить изменения"}
+</button>
+</div>
 
 <div style={{ display: "grid", gap: 10 }}>
 {(order.order_items || []).map((item) => (
@@ -402,16 +520,62 @@ wordBreak: "break-word"
 {item.name || "—"}
 </div>
 
-<div style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
-Кол-во: {item.order_qty || 0}
+<div
+style={{
+marginTop: 10,
+display: "flex",
+gap: 12,
+alignItems: "center",
+flexWrap: "wrap"
+}}
+>
+<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+<span style={{ fontSize: 13, color: "#666" }}>Кол-во:</span>
+<input
+type="number"
+min="1"
+value={item.order_qty}
+onChange={(e) =>
+changeItemQty(order.id, item.id, e.target.value)
+}
+style={{
+width: 90,
+padding: "8px 10px",
+border: "1px solid #ccc",
+borderRadius: 10,
+fontSize: 14
+}}
+/>
 </div>
 
-<div style={{ marginTop: 4, color: "#666", fontSize: 13 }}>
+<div style={{ fontSize: 13, color: "#666" }}>
 Цена: {item.display_price || "—"}
+</div>
+
+<button
+onClick={() => removeItemFromOrder(order.id, item.id)}
+style={{
+padding: "8px 10px",
+borderRadius: 10,
+border: "1px solid #e3b7b7",
+background: "#fff",
+color: "#a22",
+cursor: "pointer",
+fontSize: 13
+}}
+>
+Удалить позицию
+</button>
 </div>
 </div>
 ))}
 </div>
+
+{(order.order_items || []).length === 0 ? (
+<div style={{ marginTop: 12, color: "#a22", fontSize: 14 }}>
+В заявке не осталось позиций. Нажми «Сохранить изменения», чтобы зафиксировать.
+</div>
+) : null}
 </div>
 </div>
 ))}
@@ -514,9 +678,9 @@ maxWidth: 1600,
 margin: "0 auto"
 };
 
-const mainGridStyle = {
+const topGridStyle = {
 display: "grid",
-gridTemplateColumns: "minmax(320px, 420px) minmax(0, 1fr)",
+gridTemplateColumns: "minmax(420px, 1fr) minmax(280px, 420px)",
 gap: 24,
 alignItems: "start"
 };
