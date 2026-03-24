@@ -333,8 +333,9 @@ setLoadingMore(false);
 
 async function handleSearchClick() {
 if (!canSearch) return;
-await loadSearchBrands();
+
 await runSearch(true);
+  loadSearchBrands();
 }
 
 function scrollToTop() {
@@ -583,11 +584,7 @@ fontSize: 14
 {rows.length > 0 ? `Загружено: ${rows.length}` : " "}
 </div>
 
-{loadingBrands && (
-<div style={{ color: "#666", fontSize: 13 }}>
-Обновляю список брендов...
-</div>
-)}
+
 </div>
 
 {errorText && (
