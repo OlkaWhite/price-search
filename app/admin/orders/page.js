@@ -101,10 +101,10 @@ export default function AdminOrdersPage() {
 
   const stats = useMemo(() => {
     const total = orders.length;
-    const newCount = orders.filter((o) => o.status === "new").length;
-    const inProgressCount = orders.filter((o) => o.status === "in_progress").length;
-    const processedCount = orders.filter((o) => o.status === "processed").length;
-    const canceledCount = orders.filter((o) => o.status === "canceled").length;
+    const newCount = orders.filter((o) => o.status === "Новый").length;
+    const inProgressCount = orders.filter((o) => o.status === "В работе").length;
+    const processedCount = orders.filter((o) => o.status === "Обработан").length;
+    const canceledCount = orders.filter((o) => o.status === "Отменён").length;
 
     const totalAmount = orders.reduce((sum, order) => {
       return sum + calcOrderTotal(order);
