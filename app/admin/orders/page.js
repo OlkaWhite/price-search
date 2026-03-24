@@ -17,56 +17,81 @@ export default function AdminOrdersPage() {
     setLoading(true);
     setErrorText("");
 
-    let req = supabase
-      .from("orders")
-      .select(`
-        id,
-        user_id,
-        customer_name,
-        customer_contact,
-        customer_comment,
-        status,
-        manager_comment,
-        created_at,
-        processed_at,
-        order_items (
+    try {
+      let req = supabase
+        .from("orders")
+        .select(`
           id,
-          brand,
-          pn,
-          name,
-          order_qty,
-          stock_qty,
-          display_price,
-          price_byn
-        ),
-        profiles:user_id (
-          email,
-          company_name,
-          contact_name,
-          phone,
-          telegram
-        )
-      `)
-      .order("created_at", { ascending: false });
+          user_id,
+          customer_name,
+          customer_contact,
+          customer_comment,
+          status,
+          manager_comment,
+          created_at,
+          processed_at,
+          order_items (
+            id,
+            brand,
+            pn,
+            name,
+            order_qty,
+            stock_qty,
+            display_price,
+            price_byn
+          )
+        `)
+        .order("created_at", { ascending: false });
 
-    if (statusFilter !== "all") {
-      req = req.eq("status", statusFilter);
-    }
+      if (statusFilter !== "all") {
+        req = req.eq("status", statusFilter);
+      }
 
-    const { data, error } = await req;
+      const { data: ordersData, error: ordersError } = await req;
 
-    if (error) {
-      setErrorText(error.message);
-      setOrders([]);
-    } else {
-      setOrders(data || []);
+      if (ordersError) {
+        throw ordersError;
+      }
+
+      const userIds = Array.from(
+        new Set((ordersData || []).map((o) => o.user_id).filter(Boolean))
+      );
+
+      let profilesMap = {};
+
+      if (userIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, email, company_name, contact_name, phone, telegram")
+          .in("id", userIds);
+
+        if (profilesError) {
+          throw profilesError;
+        }
+
+        profilesMap = Object.fromEntries(
+          (profilesData || []).map((p) => [p.id, p])
+        );
+      }
+
+      const enrichedOrders = (ordersData || []).map((order) => ({
+        ...order,
+        profile: profilesMap[order.user_id] || null
+      }));
+
+      setOrders(enrichedOrders);
+
       if (selectedOrder) {
-        const fresh = (data || []).find((o) => o.id === selectedOrder.id);
+        const fresh = enrichedOrders.find((o) => o.id === selectedOrder.id);
         setSelectedOrder(fresh || null);
       }
+    } catch (err) {
+      console.error("Admin orders load error:", err);
+      setErrorText(err?.message || "Не удалось загрузить заказы.");
+      setOrders([]);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -130,7 +155,7 @@ export default function AdminOrdersPage() {
           justifyContent: "space-between",
           gap: 16,
           flexWrap: "wrap",
-          alignItems: "center",
+alignItems: "center",
           marginBottom: 20
         }}
       >
@@ -156,7 +181,7 @@ export default function AdminOrdersPage() {
               <option key={status} value={status}>
                 {status === "all" ? "Все статусы" : status}
               </option>
-                                ))}
+            ))}
           </select>
 
           <button
@@ -263,7 +288,7 @@ export default function AdminOrdersPage() {
 
                     return (
                       <tr
-                        key={order.id}
+key={order.id}
                         style={{
                           background: isActive ? "#f7f7f7" : "#fff"
                         }}
@@ -281,7 +306,7 @@ export default function AdminOrdersPage() {
                           </div>
                         </td>
                         <td style={tdStyle}>
-                            <StatusBadge status={order.status} />
+                          <StatusBadge status={order.status} />
                         </td>
                         <td style={tdStyle}>{itemsCount}</td>
                         <td style={tdStyle}>{calcOrderTotal(order).toFixed(2)} BYN</td>
@@ -339,26 +364,11 @@ export default function AdminOrdersPage() {
                 label="Комментарий клиента"
                 value={selectedOrder.customer_comment || "—"}
               />
-              <InfoRow
-                label="Email"
-                value={selectedOrder.profiles?.email || "—"}
-              />
-              <InfoRow
-                label="Компания"
-                value={selectedOrder.profiles?.company_name || "—"}
-              />
-              <InfoRow
-                label="Контактное лицо"
-                value={selectedOrder.profiles?.contact_name || "—"}
-              />
-              <InfoRow
-                label="Телефон"
-                value={selectedOrder.profiles?.phone || "—"}
-              />
-              <InfoRow
-                label="Telegram"
-                value={selectedOrder.profiles?.telegram || "—"}
-              />
+              <InfoRow label="Email" value={selectedOrder.profile?.email || "—"} />
+              <InfoRow label="Компания" value={selectedOrder.profile?.company_name || "—"} />
+              <InfoRow label="Контактное лицо" value={selectedOrder.profile?.contact_name || "—"} />
+              <InfoRow label="Телефон" value={selectedOrder.profile?.phone || "—"} />
+              <InfoRow label="Telegram" value={selectedOrder.profile?.telegram || "—"} />
               <InfoRow
                 label="Сумма заказа"
                 value={`${calcOrderTotal(selectedOrder).toFixed(2)} BYN`}
@@ -380,7 +390,8 @@ export default function AdminOrdersPage() {
                   fontSize: 14
                 }}
               >
-                {STATUS_OPTIONS.filter((s) => s !== "all").map((status) => (
+                {STATUS_OPTIONS.filter((s) => s !== "all").
+map((status) => (
                   <option key={status} value={status}>
                     {status}
                   </option>
@@ -397,7 +408,7 @@ export default function AdminOrdersPage() {
                     ...prev,
                     manager_comment: e.target.value
                   }))
-}
+                }
                 rows={4}
                 style={{
                   width: "100%",
@@ -442,7 +453,7 @@ export default function AdminOrdersPage() {
                     }}
                   >
                     <div style={{ fontWeight: 700 }}>
-                      {item.brand || "—"} {item.pn || ""}
+                      {item.brand  "—"} {item.pn  ""}
                     </div>
 
                     <div style={{ marginTop: 4, color: "#444", fontSize: 14 }}>
@@ -509,7 +520,7 @@ function StatusBadge({ status }) {
     <span
       style={{
         display: "inline-block",
-        padding: "6px 10px",
+padding: "6px 10px",
         borderRadius: 999,
         background: item.bg,
         color: item.color,
@@ -539,7 +550,7 @@ function StatCard({ title, value }) {
         borderRadius: 16,
         padding: 18,
         background: "#fff"
-        }}
+      }}
     >
       <div style={{ color: "#666", marginBottom: 8, fontSize: 13 }}>{title}</div>
       <div style={{ fontSize: 26, fontWeight: 700 }}>{value}</div>
