@@ -782,7 +782,7 @@ textAlign: "center",
 fontSize: 13
 }}
 >
-Войти для заказа
+Войти в лк
 </a>
 )}
 </td>
