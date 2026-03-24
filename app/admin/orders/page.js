@@ -36,6 +36,7 @@ customer_contact,
 customer_comment,
 status,
 manager_comment,
+invoice_url,
 created_at,
 processed_at,
 order_items (
@@ -136,6 +137,7 @@ setSaving(true);
 const payload = {
 status: selectedOrder.status,
 manager_comment: selectedOrder.manager_comment || "",
+invoice_url: selectedOrder.invoice_url?.trim() || null,
 processed_at:
 selectedOrder.status === "processed" ? new Date().toISOString() : null
 };
@@ -309,11 +311,9 @@ background: isActive ? "#f7f7f7" : "#fff"
 <div style={{ fontWeight: 600 }}>
 {order.customer_name || "—"}
 </div>
-
 <div style={{ color: "#666", fontSize: 13 }}>
 {order.profile?.company_name || "—"}
 </div>
-
 <div style={{ color: "#666", fontSize: 13 }}>
 {order.customer_contact || "—"}
 </div>
@@ -431,6 +431,43 @@ fontSize: 14,
 resize: "vertical"
 }}
 />
+</div>
+
+<div style={{ marginTop: 18 }}>
+<div style={{ fontWeight: 700, marginBottom: 8 }}>Ссылка на счёт</div>
+<input
+value={selectedOrder.invoice_url || ""}
+onChange={(e) =>
+setSelectedOrder((prev) => ({
+...prev,
+invoice_url: e.target.value
+}))
+}
+placeholder="https://..."
+style={{
+width: "100%",
+padding: "10px 12px",
+border: "1px solid #ccc",
+borderRadius: 10,
+fontSize: 14,
+boxSizing: "border-box"
+}}
+/>
+{selectedOrder.invoice_url ? (
+<a
+href={selectedOrder.invoice_url}
+target="_blank"
+rel="noopener noreferrer"
+style={{
+display: "inline-block",
+marginTop: 10,
+color: "#111",
+fontSize: 14
+}}
+>
+Открыть счёт
+</a>
+) : null}
 </div>
 
 <div style={{ marginTop: 18 }}>
