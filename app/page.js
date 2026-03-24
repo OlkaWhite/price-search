@@ -311,33 +311,8 @@ const [profileLoaded, setProfileLoaded] = useState(false);
     }
   }
 
-  useEffect(() => {
-    if (!canSearch) {
-      setRows([]);
-      setPage(0);
-      setHasMore(false);
-      return;
-    }
 
-    const t = setTimeout(() => runSearch(true), 350);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, brand, priceSort]);
 
-  useEffect(() => {
-  if (!canSearch) {
-    setSearchBrands([]);
-    setLoadingBrands(false);
-    return;
-  }
-
-  const t = setTimeout(() => {
-    loadSearchBrands();
-  }, 600);
-
-  return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [query]);
 
   useEffect(() => {
     function handleScroll() {
@@ -650,7 +625,11 @@ async function handleSubmitOrder() {
         </select>
 
         <button
-          onClick={() => runSearch(true)}
+          onClick={async () => {
+  if (!canSearch) return;
+  await loadSearchBrands();
+  await runSearch(true);
+}}
           disabled={!canSearch || loading}
           style={{
             padding: "10px 14px",
