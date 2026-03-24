@@ -233,13 +233,25 @@ setPage(0);
 setHasMore(false);
 }
 
+function formatUpdateDate(value) {
+if (!value) return "—";
+
+const d = new Date(value);
+if (Number.isNaN(d.getTime())) return "—";
+
+const day = String(d.getDate()).padStart(2, "0");
+const month = String(d.getMonth() + 1).padStart(2, "0");
+
+return `${day}.${month}`;
+}
+
 function buildRowsQuery() {
 const q = query.trim();
 
 let req = supabase
 .from("offers_view")
 .select(
-"id,brand,pn,name,qty,price_byn,price_rub,price_usd,supplier,pricelist_name"
+"id,brand,pn,name,qty,price_byn,price_rub,price_usd,supplier,pricelist_name,last_upload_at"
 );
 
 if (q) {
@@ -640,6 +652,7 @@ tableLayout: "fixed"
 <col style={{ width: "auto" }} />
 <col style={{ width: "80px" }} />
 <col style={{ width: "120px" }} />
+<col style={{ width: "90px" }} />
 <col style={{ width: "130px" }} />
 </colgroup>
 
@@ -651,6 +664,7 @@ tableLayout: "fixed"
 "Наименование",
 "Кол-во",
 "Цена (BYN)",
+"Обновлён",
 "Действие"
 ].map((h) => (
 <th
@@ -746,6 +760,17 @@ verticalAlign: "top"
 style={{
 padding: "8px",
 borderBottom: "1px solid #eee",
+whiteSpace: "nowrap",
+verticalAlign: "top"
+}}
+>
+{formatUpdateDate(r.last_upload_at)}
+</td>
+
+<td
+style={{
+padding: "8px",
+borderBottom: "1px solid #eee",
 verticalAlign: "top"
 }}
 >
@@ -782,7 +807,7 @@ textAlign: "center",
 fontSize: 13
 }}
 >
-Войти в лк
+Войти для заказа
 </a>
 )}
 </td>
@@ -792,7 +817,7 @@ fontSize: 13
 
 {rows.length === 0 && (
 <tr>
-<td colSpan={6} style={{ padding: "14px 8px", color: "#666" }}>
+<td colSpan={7} style={{ padding: "14px 8px", color: "#666" }}>
 {canSearch
 ? loading
 ? "Идёт поиск..."
