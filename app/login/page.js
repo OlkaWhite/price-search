@@ -14,6 +14,26 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
   const [errorText, setErrorText] = useState("");
 
+  async function redirectByRole(userId) {
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error(error);
+      router.replace("/account");
+      return;
+    }
+
+    if (profile?.role === "admin") {
+      router.replace("/admin");
+    } else {
+      router.replace("/account");
+    }
+  }
+
   useEffect(() => {
     let mounted = true;
 
@@ -22,15 +42,15 @@ export default function LoginPage() {
         data: { session }
       } = await supabase.auth.getSession();
 
-      if (mounted && session) {
-        router.replace("/account");
+      if (mounted && session?.user) {
+        await redirectByRole(session.user.id);
       }
     })();
 
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -46,15 +66,15 @@ export default function LoginPage() {
 
     try {
       if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password
         });
 
         if (error) {
           setErrorText(error.message);
-        } else {
-          router.push("/account");
+        } else if (data?.user) {
+          await redirectByRole(data.user.id);
         }
       } else {
         const { data, error } = await supabase.auth.signUp({
@@ -70,7 +90,8 @@ export default function LoginPage() {
           if (user) {
             await supabase.from("profiles").upsert({
               id: user.id,
-              email: user.email || email.trim()
+              email: user.email || email.trim(),
+              role: "client"
             });
           }
 
@@ -80,8 +101,8 @@ export default function LoginPage() {
         }
       }
     } catch (e2) {
-      setErrorText("Что-то пошло не так.");
       console.error(e2);
+      setErrorText("Что-то пошло не так.");
     }
 
     setLoading(false);
