@@ -32,7 +32,6 @@ const [customerContact, setCustomerContact] = useState("");
 const [customerComment, setCustomerComment] = useState("");
 
 const [sessionUser, setSessionUser] = useState(null);
-const [, setProfileLoaded] = useState(false);
 
 useEffect(() => {
 let mounted = true;
@@ -46,7 +45,6 @@ if (!mounted) return;
 
 if (!session?.user) {
 setSessionUser(null);
-setProfileLoaded(true);
 return;
 }
 
@@ -75,8 +73,6 @@ setCustomerContact(session.user.email);
 } else if (session.user.email) {
 setCustomerContact(session.user.email);
 }
-
-setProfileLoaded(true);
 }
 
 loadUserProfile();
@@ -88,7 +84,6 @@ if (!mounted) return;
 
 if (!session?.user) {
 setSessionUser(null);
-setProfileLoaded(true);
 return;
 }
 
@@ -117,8 +112,6 @@ setCustomerContact(session.user.email);
 } else if (session.user.email) {
 setCustomerContact(session.user.email);
 }
-
-setProfileLoaded(true);
 });
 
 return () => {
@@ -130,7 +123,7 @@ subscription.unsubscribe();
 useEffect(() => {
 let cancelled = false;
 
-(async () => {
+async function loadBrands() {
 setErrorText("");
 
 const { data, error } = await supabase
@@ -146,7 +139,9 @@ return;
 
 const uniq = (data || []).map((x) => x.brand).filter(Boolean);
 setBrands(uniq);
-})();
+}
+
+loadBrands();
 
 return () => {
 cancelled = true;
@@ -197,15 +192,6 @@ console.error("Failed to save order form", e);
 }, [customerName, customerContact, customerComment]);
 
 useEffect(() => {
-if (!canSearch) {
-setRows([]);
-setSearchBrands([]);
-setPage(0);
-setHasMore(false);
-}
-}, [query, brand]);
-
-useEffect(() => {
 function handleScroll() {
 setShowScrollTop(window.scrollY > 700);
 }
@@ -230,16 +216,38 @@ const cartCount = useMemo(
 [cart]
 );
 
+function escapeForOr(value) {
+return value
+.replace(/\\/g, "\\\\")
+.replace(/,/g, "\\,")
+.replace(/\(/g, "\\(")
+.replace(/\)/g, "\\)")
+.replace(/"/g, '\\"');
+}
+
+function resetSearchState() {
+setLoading(false);
+setLoadingMore(false);
+setLoadingBrands(false);
+setErrorText("");
+setRows([]);
+setSearchBrands([]);
+setPage(0);
+setHasMore(false);
+}
+
 function buildRowsQuery() {
 const q = query.trim();
-const pattern = `%${q}%`;
 
 let req = supabase
 .from("offers_view")
-.select("id,brand,pn,name,qty,price_byn,price_rub,price_usd,supplier,pricelist_name");
+.select(
+"id,brand,pn,name,qty,price_byn,price_rub,price_usd,supplier,pricelist_name"
+);
 
 if (q) {
-req = req.or(`pn.ilike.${pattern},name.ilike.${pattern}`);
+const safeQ = escapeForOr(q);
+req = req.or(`pn.ilike.*${safeQ}*,name.ilike.*${safeQ}*`);
 }
 
 if (brand !== "ALL") {
@@ -278,85 +286,90 @@ search_text: q
 
 if (error) {
 console.error("Brands load error:", error);
+setSearchBrands([]);
 } else {
 const uniq = (data || []).map((x) => x.brand).filter(Boolean);
 setSearchBrands(uniq);
 }
 } catch (e) {
 console.error("Brands load failed:", e);
+setSearchBrands([]);
 } finally {
 setLoadingBrands(false);
 }
 }
 
 async function runSearch(reset = true) {
-  const nextPage = reset ? 0 : page + 1;
-  const from = nextPage * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
+const nextPage = reset ? 0 : page + 1;
+const from = nextPage * PAGE_SIZE;
+const to = from + PAGE_SIZE - 1;
 
-  if (reset) {
-    setLoading(true);
-  } else {
-    setLoadingMore(true);
-  }
+if (reset) {
+setLoading(true);
+} else {
+setLoadingMore(true);
+}
 
-  setErrorText("");
+setErrorText("");
 
-  try {
-    const req = buildRowsQuery().range(from, to);
-    const { data, error } = await req;
+try {
+const req = buildRowsQuery().range(from, to);
+const { data, error } = await req;
 
-    if (error) {
-      throw error;
-    }
+if (error) {
+throw error;
+}
 
-    const incoming = data || [];
+const incoming = data || [];
 
-    if (reset) {
-      setRows(incoming);
-    } else {
-      setRows((prev) => [...prev, ...incoming]);
-    }
+if (reset) {
+setRows(incoming);
+} else {
+setRows((prev) => [...prev, ...incoming]);
+}
 
-    setPage(nextPage);
-    setHasMore(incoming.length === PAGE_SIZE);
+setPage(nextPage);
+setHasMore(incoming.length === PAGE_SIZE);
 
-    return incoming.length;
-  } catch (err) {
-    console.error("runSearch error:", err);
-    setErrorText(err?.message || "Ошибка поиска.");
-    if (reset) {
-      setRows([]);
-      setHasMore(false);
-      setPage(0);
-    }
-    return 0;
-  } finally {
-    if (reset) {
-      setLoading(false);
-    } else {
-      setLoadingMore(false);
-    }
-  }
+return incoming.length;
+} catch (err) {
+console.error("runSearch error:", err);
+setErrorText(err?.message || "Ошибка поиска.");
+
+if (reset) {
+setRows([]);
+setHasMore(false);
+setPage(0);
+}
+
+return 0;
+} finally {
+if (reset) {
+setLoading(false);
+} else {
+setLoadingMore(false);
+}
+}
 }
 
 async function handleSearchClick() {
-  if (!canSearch || loading || loadingMore) return;
+if (!canSearch || loading || loadingMore) return;
 
-  setErrorText("");
-  setPage(0);
-  setHasMore(false);
+setErrorText("");
+setRows([]);
+setSearchBrands([]);
+setPage(0);
+setHasMore(false);
 
-  const foundCount = await runSearch(true);
+const foundCount = await runSearch(true);
 
-  if (foundCount > 0) {
-    loadSearchBrands();
-  } else {
-    setSearchBrands([]);
-    setLoadingBrands(false);
-  }
+if (foundCount > 0) {
+loadSearchBrands();
+} else {
+setSearchBrands([]);
+setLoadingBrands(false);
 }
-
+}
 
 function scrollToTop() {
 window.scrollTo({
@@ -533,7 +546,11 @@ flexWrap: "wrap"
 >
 <input
 value={query}
-onChange={(e) => setQuery(e.target.value)}
+onChange={(e) => {
+setQuery(e.target.value);
+resetSearchState();
+setBrand("ALL");
+}}
 onKeyDown={(e) => {
 if (e.key === "Enter") {
 e.preventDefault();
@@ -553,7 +570,10 @@ fontSize: 14
 
 <select
 value={brand}
-onChange={(e) => setBrand(e.target.value)}
+onChange={(e) => {
+setBrand(e.target.value);
+resetSearchState();
+}}
 style={{
 padding: "10px 12px",
 border: "1px solid #ccc",
@@ -571,7 +591,10 @@ fontSize: 14
 
 <select
 value={priceSort}
-onChange={(e) => setPriceSort(e.target.value)}
+onChange={(e) => {
+setPriceSort(e.target.value);
+resetSearchState();
+}}
 style={{
 padding: "10px 12px",
 border: "1px solid #ccc",
@@ -603,8 +626,6 @@ fontSize: 14
 <div style={{ color: "#666", fontSize: 13 }}>
 {rows.length > 0 ? `Загружено: ${rows.length}` : " "}
 </div>
-
-
 </div>
 
 {errorText && (
