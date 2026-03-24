@@ -453,7 +453,7 @@ map((status) => (
                     }}
                   >
                     <div style={{ fontWeight: 700 }}>
-                      {item.brand  "—"} {item.pn  ""}
+                      {item.brand || "—"} {item.pn || ""}
                     </div>
 
                     <div style={{ marginTop: 4, color: "#444", fontSize: 14 }}>
