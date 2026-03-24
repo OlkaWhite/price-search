@@ -126,9 +126,7 @@ let cancelled = false;
 async function loadBrands() {
 setErrorText("");
 
-const { data, error } = await supabase
-.from("brands_view")
-.select("brand");
+const { data, error } = await supabase.from("brands_view").select("brand");
 
 if (cancelled) return;
 
@@ -371,6 +369,19 @@ setLoadingBrands(false);
 }
 }
 
+useEffect(() => {
+if (!canSearch) return;
+if (rows.length === 0) return;
+if (loading || loadingMore) return;
+
+const t = setTimeout(() => {
+handleSearchClick();
+}, 0);
+
+return () => clearTimeout(t);
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [brand, priceSort]);
+
 function scrollToTop() {
 window.scrollTo({
 top: 0,
@@ -402,9 +413,7 @@ const existing = prev.find((item) => item.key === key);
 
 if (existing) {
 return prev.map((item) =>
-item.key === key
-? { ...item, orderQty: item.orderQty + 1 }
-: item
+item.key === key ? { ...item, orderQty: item.orderQty + 1 } : item
 );
 }
 
@@ -437,7 +446,8 @@ setCart((prev) =>
 prev
 .map((item) => {
 if (item.key !== key) return item;
-const nextQty = direction === "inc" ? item.orderQty + 1 : item.orderQty - 1;
+const nextQty =
+direction === "inc" ? item.orderQty + 1 : item.orderQty - 1;
 return { ...item, orderQty: nextQty };
 })
 .filter((item) => item.orderQty > 0)
@@ -505,7 +515,9 @@ const { error: itemsError } = await supabase
 .insert(itemsPayload);
 
 if (itemsError) {
-alert("Заявка создана, но товары не сохранились: " + itemsError.message);
+alert(
+"Заявка создана, но товары не сохранились: " + itemsError.message
+);
 return;
 }
 
@@ -572,7 +584,6 @@ fontSize: 14
 value={brand}
 onChange={(e) => {
 setBrand(e.target.value);
-resetSearchState();
 }}
 style={{
 padding: "10px 12px",
@@ -593,7 +604,6 @@ fontSize: 14
 value={priceSort}
 onChange={(e) => {
 setPriceSort(e.target.value);
-resetSearchState();
 }}
 style={{
 padding: "10px 12px",
@@ -662,7 +672,14 @@ tableLayout: "fixed"
 
 <thead>
 <tr>
-{["Бренд", "P/N", "Наименование", "Кол-во", "Цена (BYN)", "Заказать"].map((h) => (
+{[
+"Бренд",
+"P/N",
+"Наименование",
+"Кол-во",
+"Цена (BYN)",
+"Заказать"
+].map((h) => (
 <th
 key={h}
 style={{
@@ -915,7 +932,14 @@ padding: 10
 {item.brand} {item.pn}
 </div>
 
-<div style={{ fontSize: 13, color: "#444", marginBottom: 8, lineHeight: 1.35 }}>
+<div
+style={{
+fontSize: 13,
+color: "#444",
+marginBottom: 8,
+lineHeight: 1.35
+}}
+>
 {item.name}
 </div>
 
