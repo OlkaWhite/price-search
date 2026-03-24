@@ -6,6 +6,12 @@ import { supabase } from "../../lib/supabaseClient";
 
 export default function AccountPage() {
   const router = useRouter();
+  const STATUS_LABELS = {
+  new: "Новая",
+  in_progress: "В работе",
+  processed: "Обработана",
+  canceled: "Отменена"
+};
 
   const [sessionUser, setSessionUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -400,7 +406,7 @@ export default function AccountPage() {
                         fontSize: 13
                       }}
                     >
-                      {order.status}
+                      {STATUS_LABELS[order.status] || order.status}
                     </div>
                   </div>
 
