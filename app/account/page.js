@@ -152,14 +152,15 @@ window.location.href = "/";
 
 if (loading) {
 return (
-<div style={{ width: "98vw", maxWidth: 1400, margin: "0 auto", padding: "24px 16px" }}>
-Загружаю личный кабинет...
+<div style={pageWrapStyle}>
+<div style={pageInnerStyle}>Загружаю личный кабинет...</div>
 </div>
 );
 }
 
 return (
-<div style={{ width: "98vw", maxWidth: 1400, margin: "0 auto", padding: "24px 16px 60px" }}>
+<div style={pageWrapStyle}>
+<div style={pageInnerStyle}>
 <div
 style={{
 display: "flex",
@@ -171,24 +172,13 @@ marginBottom: 20
 }}
 >
 <div>
-<h1 style={{ margin: 0 }}>Личный кабинет</h1>
+<h1 style={{ margin: 0, fontSize: 32 }}>Личный кабинет</h1>
 <p style={{ marginTop: 8, color: "#666" }}>
 Профиль компании и ваши заявки
 </p>
 </div>
 
-<button
-onClick={handleLogout}
-style={{
-padding: "10px 14px",
-borderRadius: 10,
-border: "1px solid #111",
-background: "#fff",
-color: "#111",
-cursor: "pointer",
-fontSize: 14
-}}
->
+<button onClick={handleLogout} style={secondaryButtonStyle}>
 Выйти
 </button>
 </div>
@@ -223,23 +213,10 @@ color: "#9b1c1c"
 </div>
 )}
 
-<div
-style={{
-display: "grid",
-gridTemplateColumns: "0.9fr 1.1fr",
-gap: 20
-}}
->
-<div style={{ display: "grid", gap: 20 }}>
-<div
-style={{
-border: "1px solid #e5e5e5",
-borderRadius: 16,
-background: "#fff",
-padding: 20
-}}
->
-<h2 style={{ marginTop: 0 }}>Профиль</h2>
+<div style={mainGridStyle}>
+<div style={{ display: "grid", gap: 20, alignSelf: "start" }}>
+<div style={cardStyle}>
+<h2 style={{ marginTop: 0, marginBottom: 18 }}>Профиль</h2>
 
 <form onSubmit={handleSaveProfile} style={{ display: "grid", gap: 14 }}>
 <Field label="Email">
@@ -286,13 +263,10 @@ style={inputStyle}
 type="submit"
 disabled={savingProfile}
 style={{
-padding: "12px 14px",
-borderRadius: 10,
-border: "1px solid #111",
+...primaryButtonStyle,
 background: savingProfile ? "#ddd" : "#111",
 color: savingProfile ? "#333" : "#fff",
-cursor: savingProfile ? "default" : "pointer",
-fontSize: 14
+cursor: savingProfile ? "default" : "pointer"
 }}
 >
 {savingProfile ? "Сохраняю..." : "Сохранить"}
@@ -300,41 +274,31 @@ fontSize: 14
 </form>
 </div>
 
-<div
-style={{
-border: "1px solid #e5e5e5",
-borderRadius: 16,
-background: "#fff",
-padding: 20
-}}
->
-<h2 style={{ marginTop: 0 }}>Сводка</h2>
+<div style={cardStyle}>
+<h2 style={{ marginTop: 0, marginBottom: 16 }}>Сводка</h2>
 <InfoRow label="Всего заявок" value={ordersStats.total} />
-<InfoRow label="Общая сумма заявок" value={`${ordersStats.totalAmount.toFixed(2)} BYN`} />
+<InfoRow
+label="Общая сумма заявок"
+value={`${ordersStats.totalAmount.toFixed(2)} BYN`}
+/>
 </div>
 </div>
 
-<div
-style={{
-border: "1px solid #e5e5e5",
-borderRadius: 16,
-background: "#fff",
-padding: 20
-}}
->
-<h2 style={{ marginTop: 0 }}>Мои заявки</h2>
+<div style={cardStyle}>
+<h2 style={{ marginTop: 0, marginBottom: 18 }}>Мои заявки</h2>
 
 {orders.length === 0 ? (
 <div style={{ color: "#666" }}>Заявок пока нет.</div>
 ) : (
-<div style={{ display: "grid", gap: 14 }}>
+<div style={{ display: "grid", gap: 16 }}>
 {orders.map((order) => (
 <div
 key={order.id}
 style={{
-border: "1px solid #eee",
+border: "1px solid #e9e9e9",
 borderRadius: 14,
-padding: 14
+padding: 16,
+background: "#fff"
 }}
 >
 <div
@@ -347,7 +311,7 @@ flexWrap: "wrap"
 }}
 >
 <div>
-<div style={{ fontWeight: 700, fontSize: 16 }}>
+<div style={{ fontWeight: 700, fontSize: 18 }}>
 Заявка #{order.id}
 </div>
 <div style={{ color: "#666", fontSize: 13, marginTop: 4 }}>
@@ -358,7 +322,13 @@ flexWrap: "wrap"
 <StatusBadge status={order.status} />
 </div>
 
-<div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+<div
+style={{
+marginTop: 14,
+display: "grid",
+gap: 8
+}}
+>
 <InfoRow label="Контакт" value={order.customer_contact || "—"} />
 <InfoRow
 label="Комментарий к заявке"
@@ -395,8 +365,8 @@ fontSize: 14
 </a>
 ) : null}
 
-<div style={{ marginTop: 14 }}>
-<div style={{ fontWeight: 700, marginBottom: 8 }}>Позиции</div>
+<div style={{ marginTop: 16 }}>
+<div style={{ fontWeight: 700, marginBottom: 10 }}>Позиции</div>
 
 <div style={{ display: "grid", gap: 10 }}>
 {(order.order_items || []).map((item) => (
@@ -405,18 +375,34 @@ key={item.id}
 style={{
 border: "1px solid #eee",
 borderRadius: 12,
-padding: 12
+padding: 12,
+background: "#fafafa"
 }}
 >
-<div style={{ fontWeight: 700 }}>
+<div
+style={{
+fontWeight: 700,
+overflowWrap: "anywhere",
+wordBreak: "break-word"
+}}
+>
 {item.brand || "—"} {item.pn || ""}
 </div>
 
-<div style={{ marginTop: 4, color: "#444", fontSize: 14 }}>
+<div
+style={{
+marginTop: 4,
+color: "#444",
+fontSize: 14,
+lineHeight: 1.4,
+overflowWrap: "anywhere",
+wordBreak: "break-word"
+}}
+>
 {item.name || "—"}
 </div>
 
-<div style={{ marginTop: 6, color: "#666", fontSize: 13 }}>
+<div style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
 Кол-во: {item.order_qty || 0}
 </div>
 
@@ -431,6 +417,7 @@ padding: 12
 ))}
 </div>
 )}
+</div>
 </div>
 </div>
 </div>
@@ -480,7 +467,8 @@ borderRadius: 999,
 background: item.bg,
 color: item.color,
 fontSize: 12,
-fontWeight: 600
+fontWeight: 600,
+whiteSpace: "nowrap"
 }}
 >
 {item.label}
@@ -501,10 +489,45 @@ function InfoRow({ label, value }) {
 return (
 <div>
 <div style={{ fontSize: 12, color: "#666", marginBottom: 2 }}>{label}</div>
-<div style={{ fontSize: 14 }}>{value}</div>
+<div
+style={{
+fontSize: 14,
+overflowWrap: "anywhere",
+wordBreak: "break-word"
+}}
+>
+{value}
+</div>
 </div>
 );
 }
+
+const pageWrapStyle = {
+width: "100%",
+padding: "24px 16px 60px",
+boxSizing: "border-box"
+};
+
+const pageInnerStyle = {
+width: "100%",
+maxWidth: 1600,
+margin: "0 auto"
+};
+
+const mainGridStyle = {
+display: "grid",
+gridTemplateColumns: "minmax(320px, 420px) minmax(0, 1fr)",
+gap: 24,
+alignItems: "start"
+};
+
+const cardStyle = {
+border: "1px solid #e5e5e5",
+borderRadius: 16,
+background: "#fff",
+padding: 20,
+minWidth: 0
+};
 
 const inputStyle = {
 width: "100%",
@@ -513,4 +536,23 @@ border: "1px solid #ccc",
 borderRadius: 10,
 fontSize: 14,
 boxSizing: "border-box"
+};
+
+const primaryButtonStyle = {
+padding: "12px 14px",
+borderRadius: 10,
+border: "1px solid #111",
+background: "#111",
+color: "#fff",
+fontSize: 14
+};
+
+const secondaryButtonStyle = {
+padding: "10px 14px",
+borderRadius: 10,
+border: "1px solid #111",
+background: "#fff",
+color: "#111",
+cursor: "pointer",
+fontSize: 14
 };
