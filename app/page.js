@@ -578,18 +578,26 @@ async function handleSubmitOrder() {
         }}
       >
         <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Поиск: парт-номер или текст..."
-          style={{
-            width: 420,
-            maxWidth: "100%",
-            padding: "10px 12px",
-            border: "1px solid #ccc",
-            borderRadius: 10,
-            fontSize: 14
-          }}
-        />
+  value={query}
+  onChange={(e) => setQuery(e.target.value)}
+  onKeyDown={async (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (!canSearch) return;
+      await loadSearchBrands();
+      await runSearch(true);
+    }
+  }}
+  placeholder="Поиск: парт-номер или текст..."
+  style={{
+    width: 420,
+    maxWidth: "100%",
+    padding: "10px 12px",
+    border: "1px solid #ccc",
+    borderRadius: 10,
+    fontSize: 14
+  }}
+/>
 
         <select
           value={brand}
