@@ -93,6 +93,7 @@ export default function AccountPage() {
           customer_contact,
           customer_comment,
           status,
+          invoice_url,
           created_at,
           order_items (
             id,
