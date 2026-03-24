@@ -10,7 +10,6 @@ const FORM_STORAGE_KEY = "b2bpart_order_form_v1";
 export default function Page() {
 const [query, setQuery] = useState("");
 const [brand, setBrand] = useState("ALL");
-const [priceSort, setPriceSort] = useState("default");
 
 const [brands, setBrands] = useState([]);
 const [searchBrands, setSearchBrands] = useState([]);
@@ -252,16 +251,7 @@ if (brand !== "ALL") {
 req = req.eq("brand", brand);
 }
 
-if (priceSort === "asc") {
 req = req.order("price_byn", { ascending: true, nullsFirst: false });
-} else if (priceSort === "desc") {
-req = req.order("price_byn", { ascending: false, nullsFirst: false });
-} else {
-req = req
-.order("brand", { ascending: true })
-.order("pn", { ascending: true })
-.order("price_byn", { ascending: true, nullsFirst: false });
-}
 
 return req;
 }
@@ -380,7 +370,7 @@ handleSearchClick();
 
 return () => clearTimeout(t);
 // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [brand, priceSort]);
+}, [brand]);
 
 function scrollToTop() {
 window.scrollTo({
@@ -598,23 +588,6 @@ fontSize: 14
 {b}
 </option>
 ))}
-</select>
-
-<select
-value={priceSort}
-onChange={(e) => {
-setPriceSort(e.target.value);
-}}
-style={{
-padding: "10px 12px",
-border: "1px solid #ccc",
-borderRadius: 10,
-fontSize: 14
-}}
->
-<option value="default">Сортировка цены</option>
-<option value="asc">Цена: по возрастанию</option>
-<option value="desc">Цена: по убыванию</option>
 </select>
 
 <button
