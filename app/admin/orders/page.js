@@ -301,6 +301,9 @@ key={order.id}
                           <div style={{ fontWeight: 600 }}>
                             {order.customer_name || "—"}
                           </div>
+                        <div style={{ color: "#666", fontSize: 13 }}>
+                              {order.profile?.company_name || "—"}
+                          </div>
                           <div style={{ color: "#666", fontSize: 13 }}>
                             {order.customer_contact || "—"}
                           </div>
