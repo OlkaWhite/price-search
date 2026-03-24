@@ -290,49 +290,62 @@ setLoadingBrands(false);
 }
 
 async function runSearch(reset = true) {
-const nextPage = reset ? 0 : page + 1;
-const from = nextPage * PAGE_SIZE;
-const to = from + PAGE_SIZE - 1;
+  const nextPage = reset ? 0 : page + 1;
+  const from = nextPage * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
 
-if (reset) {
-setLoading(true);
-setErrorText("");
-} else {
-setLoadingMore(true);
-setErrorText("");
-}
+  if (reset) {
+    setLoading(true);
+  } else {
+    setLoadingMore(true);
+  }
 
-const req = buildRowsQuery().range(from, to);
-const { data, error } = await req;
+  setErrorText("");
 
-if (error) {
-setErrorText(error.message);
-if (reset) {
-setRows([]);
-setHasMore(false);
-}
-} else {
-const incoming = data || [];
+  try {
+    const req = buildRowsQuery().range(from, to);
+    const { data, error } = await req;
 
-if (reset) {
-setRows(incoming);
-} else {
-setRows((prev) => [...prev, ...incoming]);
-}
+    if (error) {
+      throw error;
+    }
 
-setPage(nextPage);
-setHasMore(incoming.length === PAGE_SIZE);
-}
+    const incoming = data || [];
 
-if (reset) {
-setLoading(false);
-} else {
-setLoadingMore(false);
-}
+    if (reset) {
+      setRows(incoming);
+    } else {
+      setRows((prev) => [...prev, ...incoming]);
+    }
+
+    setPage(nextPage);
+    setHasMore(incoming.length === PAGE_SIZE);
+
+    return incoming.length;
+  } catch (err) {
+    console.error("runSearch error:", err);
+    setErrorText(err?.message || "Ошибка поиска.");
+    if (reset) {
+      setRows([]);
+      setHasMore(false);
+      setPage(0);
+    }
+    return 0;
+  } finally {
+    if (reset) {
+      setLoading(false);
+    } else {
+      setLoadingMore(false);
+    }
+  }
 }
 
 async function handleSearchClick() {
-  if (!canSearch) return;
+  if (!canSearch  loading  loadingMore) return;
+
+  setErrorText("");
+  setPage(0);
+  setHasMore(false);
 
   const foundCount = await runSearch(true);
 
@@ -343,6 +356,7 @@ async function handleSearchClick() {
     setLoadingBrands(false);
   }
 }
+
 
 function scrollToTop() {
 window.scrollTo({
