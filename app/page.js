@@ -651,7 +651,7 @@ tableLayout: "fixed"
 "Наименование",
 "Кол-во",
 "Цена (BYN)",
-"Заказать"
+"Действие"
 ].map((h) => (
 <th
 key={h}
@@ -749,6 +749,7 @@ borderBottom: "1px solid #eee",
 verticalAlign: "top"
 }}
 >
+{sessionUser ? (
 <button
 onClick={() => addToCart(r)}
 style={{
@@ -764,6 +765,26 @@ width: "100%"
 >
 {added ? "Добавлено" : "В заказ"}
 </button>
+) : (
+<a
+href="/login"
+style={{
+display: "inline-block",
+width: "100%",
+boxSizing: "border-box",
+padding: "8px 10px",
+borderRadius: 10,
+border: "1px solid #ccc",
+background: "#fff",
+color: "#111",
+textDecoration: "none",
+textAlign: "center",
+fontSize: 13
+}}
+>
+Войти для заказа
+</a>
+)}
 </td>
 </tr>
 );
@@ -784,27 +805,7 @@ width: "100%"
 </table>
 </div>
 
-{rows.length > 0 && hasMore && (
-<div style={{ display: "flex", justifyContent: "center", marginTop: 20 }}>
-<button
-onClick={() => runSearch(false)}
-disabled={loadingMore}
-style={{
-padding: "12px 18px",
-borderRadius: 12,
-border: "1px solid #111",
-background: loadingMore ? "#ddd" : "#fff",
-color: "#111",
-cursor: loadingMore ? "default" : "pointer",
-fontSize: 14
-}}
->
-{loadingMore ? "Загружаю..." : "Показать ещё"}
-</button>
-</div>
-)}
-
-{cart.length > 0 && (
+{sessionUser && cart.length > 0 && (
 <button
 onClick={() => setOrderOpen((v) => !v)}
 style={{
@@ -832,7 +833,7 @@ onClick={scrollToTop}
 style={{
 position: "fixed",
 right: 24,
-bottom: cart.length > 0 ? (orderOpen ? 500 : 84) : 24,
+bottom: sessionUser && cart.length > 0 ? (orderOpen ? 500 : 84) : 24,
 zIndex: 1000,
 padding: "12px 16px",
 borderRadius: 999,
@@ -848,7 +849,7 @@ boxShadow: "0 8px 24px rgba(0,0,0,0.18)"
 </button>
 )}
 
-{orderOpen && (
+{sessionUser && orderOpen && (
 <div
 style={{
 position: "fixed",
@@ -980,7 +981,6 @@ fontSize: 13
 </div>
 
 <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-{sessionUser ? (
 <div
 style={{
 padding: "10px 12px",
@@ -995,35 +995,6 @@ color: "#444"
 <b>{customerName || sessionUser.email || "клиента"}</b>
 {customerContact ? <> · {customerContact}</> : null}
 </div>
-) : (
-<>
-<input
-value={customerName}
-onChange={(e) => setCustomerName(e.target.value)}
-placeholder="Ваше имя"
-style={{
-width: "100%",
-padding: "10px 12px",
-border: "1px solid #ccc",
-borderRadius: 10,
-fontSize: 14
-}}
-/>
-
-<input
-value={customerContact}
-onChange={(e) => setCustomerContact(e.target.value)}
-placeholder="Телефон или Telegram"
-style={{
-width: "100%",
-padding: "10px 12px",
-border: "1px solid #ccc",
-borderRadius: 10,
-fontSize: 14
-}}
-/>
-</>
-)}
 
 <textarea
 value={customerComment}
