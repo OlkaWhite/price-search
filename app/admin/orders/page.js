@@ -156,7 +156,7 @@ export default function AdminOrdersPage() {
               <option key={status} value={status}>
                 {status === "all" ? "Все статусы" : status}
               </option>
-))}
+                                ))}
           </select>
 
           <button
@@ -281,7 +281,7 @@ export default function AdminOrdersPage() {
                           </div>
                         </td>
                         <td style={tdStyle}>
-<StatusBadge status={order.status} />
+                            <StatusBadge status={order.status} />
                         </td>
                         <td style={tdStyle}>{itemsCount}</td>
                         <td style={tdStyle}>{calcOrderTotal(order).toFixed(2)} BYN</td>
@@ -539,7 +539,7 @@ function StatCard({ title, value }) {
         borderRadius: 16,
         padding: 18,
         background: "#fff"
-}}
+        }}
     >
       <div style={{ color: "#666", marginBottom: 8, fontSize: 13 }}>{title}</div>
       <div style={{ fontSize: 26, fontWeight: 700 }}>{value}</div>
