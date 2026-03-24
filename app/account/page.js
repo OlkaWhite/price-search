@@ -802,7 +802,7 @@ boxSizing: "border-box"
 
 const pageInnerStyle = {
 width: "100%",
-maxWidth: 1600,
+maxWidth: "100%",
 margin: "0 auto"
 };
 
