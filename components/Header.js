@@ -70,48 +70,48 @@ export default function Header() {
         }}
       >
         <div
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    flexWrap: "wrap"
-  }}
->
-  <Link
-    href="/"
-    style={{
-      textDecoration: "none",
-      color: "#111",
-      fontSize: 22,
-      fontWeight: 700,
-      whiteSpace: "nowrap"
-    }}
-  >
-    b2bpart.ru
-  </Link>
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap"
+          }}
+        >
+          <Link
+            href="/"
+            style={{
+              textDecoration: "none",
+              color: "#111",
+              fontSize: 22,
+              fontWeight: 700,
+              whiteSpace: "nowrap"
+            }}
+          >
+            b2bpart.ru
+          </Link>
 
-  <a
-    href="https://t.me/OlkaWhite"
-    target="_blank"
-    rel="noopener noreferrer"
-    style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "10px 12px",
-      border: "1px solid #ccc",
-      borderRadius: 10,
-      fontSize: 14,
-      color: "#111",
-      textDecoration: "none",
-      background: "#fff",
-      whiteSpace: "nowrap"
-    }}
-  >
-    <span style={{ fontSize: 10}}>✈️</span>
-    <span>Связаться с разработчиком</span>
-  </a>
-</div>
+          <a
+            href="https://t.me/OlkaWhite"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 12px",
+              border: "1px solid #ccc",
+              borderRadius: 10,
+              fontSize: 14,
+              color: "#111",
+              textDecoration: "none",
+              background: "#fff",
+              whiteSpace: "nowrap"
+            }}
+          >
+            <span style={{ fontSize: 15 }}>✈️</span>
+            <span>Связаться с разработчиком</span>
+          </a>
+        </div>
 
         <div
           style={{
@@ -154,6 +154,8 @@ export default function Header() {
           >
             Личный кабинет
           </Link>
+
+          {!loading && user && <AdminLink userId={user.id} />}
 
           {!loading && !user && (
             <Link
@@ -209,5 +211,50 @@ export default function Header() {
         </div>
       </div>
     </header>
+  );
+}
+
+function AdminLink({ userId }) {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkRole() {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (!mounted) return;
+      setIsAdmin(profile?.role === "admin");
+    }
+
+    checkRole();
+
+    return () => {
+      mounted = false;
+    };
+  }, [userId]);
+
+  if (!isAdmin) return null;
+
+  return (
+    <Link
+      href="/admin"
+      style={{
+        padding: "10px 12px",
+        border: "1px solid #ccc",
+        borderRadius: 10,
+        textDecoration: "none",
+        color: "#111",
+        background: "#fff",
+        fontSize: 14,
+        whiteSpace: "nowrap"
+      }}
+    >
+      Админка
+    </Link>
   );
 }
