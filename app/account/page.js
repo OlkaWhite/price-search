@@ -18,6 +18,7 @@ const [orders, setOrders] = useState([]);
 const [loading, setLoading] = useState(true);
 const [savingProfile, setSavingProfile] = useState(false);
 const [savingOrderId, setSavingOrderId] = useState(null);
+const [requestingInvoiceId, setRequestingInvoiceId] = useState(null);
 const [errorText, setErrorText] = useState("");
 const [message, setMessage] = useState("");
 
@@ -28,12 +29,14 @@ const [companyName, setCompanyName] = useState("");
 const [contactName, setContactName] = useState("");
 const [phone, setPhone] = useState("");
 const [telegram, setTelegram] = useState("");
+const [unp, setUnp] = useState("");
 
 const [profileDraft, setProfileDraft] = useState({
 companyName: "",
 contactName: "",
 phone: "",
-telegram: ""
+telegram: "",
+unp: ""
 });
 
 useEffect(() => {
@@ -60,7 +63,7 @@ setSessionUser(session.user);
 
 const { data: profileData, error: profileError } = await supabase
 .from("profiles")
-.select("id, email, company_name, contact_name, phone, telegram, role")
+.select("id, email, company_name, contact_name, phone, telegram, unp, role")
 .eq("id", session.user.id)
 .maybeSingle();
 
@@ -76,6 +79,7 @@ customer_comment,
 status,
 manager_comment,
 invoice_url,
+invoice_requested,
 created_at,
 order_items (
 id,
@@ -110,17 +114,20 @@ const nextCompany = profileData?.company_name || "";
 const nextContact = profileData?.contact_name || "";
 const nextPhone = profileData?.phone || "";
 const nextTelegram = profileData?.telegram || "";
+const nextUnp = profileData?.unp || "";
 
 setCompanyName(nextCompany);
 setContactName(nextContact);
 setPhone(nextPhone);
 setTelegram(nextTelegram);
+setUnp(nextUnp);
 
 setProfileDraft({
 companyName: nextCompany,
 contactName: nextContact,
 phone: nextPhone,
-telegram: nextTelegram
+telegram: nextTelegram,
+unp: nextUnp
 });
 } catch (err) {
 console.error("Account load error:", err);
@@ -149,7 +156,8 @@ setProfileDraft({
 companyName,
 contactName,
 phone,
-telegram
+telegram,
+unp
 });
 setProfileEditMode(true);
 }
@@ -159,7 +167,8 @@ setProfileDraft({
 companyName,
 contactName,
 phone,
-telegram
+telegram,
+unp
 });
 setProfileEditMode(false);
 }
@@ -180,7 +189,8 @@ email: sessionUser.email || null,
 company_name: profileDraft.companyName.trim() || null,
 contact_name: profileDraft.contactName.trim() || null,
 phone: profileDraft.phone.trim() || null,
-telegram: profileDraft.telegram.trim() || null
+telegram: profileDraft.telegram.trim() || null,
+unp: profileDraft.unp.trim() || null
 };
 
 const { error } = await supabase.from("profiles").upsert(payload);
@@ -191,6 +201,7 @@ setCompanyName(profileDraft.companyName);
 setContactName(profileDraft.contactName);
 setPhone(profileDraft.phone);
 setTelegram(profileDraft.telegram);
+setUnp(profileDraft.unp);
 
 setProfile((prev) =>
 prev
@@ -199,7 +210,8 @@ prev
 company_name: profileDraft.companyName.trim() || null,
 contact_name: profileDraft.contactName.trim() || null,
 phone: profileDraft.phone.trim() || null,
-telegram: profileDraft.telegram.trim() || null
+telegram: profileDraft.telegram.trim() || null,
+unp: profileDraft.unp.trim() || null
 }
 : prev
 );
@@ -317,6 +329,34 @@ console.error("Order save error:", err);
 setErrorText(err?.message || "Не удалось сохранить заявку.");
 } finally {
 setSavingOrderId(null);
+}
+}
+
+async function handleRequestInvoice(orderId) {
+try {
+setRequestingInvoiceId(orderId);
+setErrorText("");
+setMessage("");
+
+const { error } = await supabase
+.from("orders")
+.update({ invoice_requested: true })
+.eq("id", orderId);
+
+if (error) throw error;
+
+setOrders((prev) =>
+prev.map((order) =>
+order.id === orderId ? { ...order, invoice_requested: true } : order
+)
+);
+
+setMessage(`Запрос на счёт по заявке #${orderId} отправлен.`);
+} catch (err) {
+console.error("Invoice request error:", err);
+setErrorText(err?.message || "Не удалось запросить счёт.");
+} finally {
+setRequestingInvoiceId(null);
 }
 }
 
@@ -439,6 +479,16 @@ style={inputStyle}
 />
 </Field>
 
+<Field label="УНП">
+<input
+value={profileDraft.unp}
+onChange={(e) =>
+setProfileDraft((prev) => ({ ...prev, unp: e.target.value }))
+}
+style={inputStyle}
+/>
+</Field>
+
 <Field label="Телефон">
 <input
 value={profileDraft.phone}
@@ -531,6 +581,46 @@ flexWrap: "wrap"
 
 <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
 <StatusBadge status={order.status} />
+
+{order.invoice_url ? (
+<a
+href={order.invoice_url}
+target="_blank"
+rel="noopener noreferrer"
+style={{
+display: "inline-block",
+padding: "10px 12px",
+borderRadius: 10,
+border: "1px solid #111",
+background: "#111",
+color: "#fff",
+textDecoration: "none",
+fontSize: 14
+}}
+>
+Скачать счёт
+</a>
+) : null}
+
+<button
+onClick={() => handleRequestInvoice(order.id)}
+disabled={requestingInvoiceId === order.id || order.invoice_requested}
+style={{
+...secondaryButtonStyle,
+background: order.invoice_requested ? "#f3f3f3" : "#fff",
+color: "#111",
+cursor:
+requestingInvoiceId === order.id || order.invoice_requested
+? "default"
+: "pointer"
+}}
+>
+{order.invoice_requested
+? "Счёт запрошен"
+: requestingInvoiceId === order.id
+? "Отправляю..."
+: "Запросить счёт"}
+</button>
 
 {!isEditing ? (
 <button
@@ -661,39 +751,8 @@ width: "100%"
 </div>
 ) : null}
 
-<div
-style={{
-marginTop: 14,
-display: "flex",
-justifyContent: "space-between",
-gap: 12,
-alignItems: "center",
-flexWrap: "wrap"
-}}
->
-<div style={{ fontWeight: 700 }}>
+<div style={{ marginTop: 14, fontWeight: 700 }}>
 Общая сумма: {calcOrderTotal(order).toFixed(2)} BYN
-</div>
-
-{order.invoice_url ? (
-<a
-href={order.invoice_url}
-target="_blank"
-rel="noopener noreferrer"
-style={{
-display: "inline-block",
-padding: "10px 12px",
-borderRadius: 10,
-border: "1px solid #111",
-background: "#111",
-color: "#fff",
-textDecoration: "none",
-fontSize: 14
-}}
->
-Скачать счёт
-</a>
-) : null}
 </div>
 </div>
 );
@@ -801,8 +860,8 @@ boxSizing: "border-box"
 };
 
 const pageInnerStyle = {
-width: "80%",
-maxWidth: 1600,
+width: "100%",
+maxWidth: "100%",
 margin: "0 auto"
 };
 
