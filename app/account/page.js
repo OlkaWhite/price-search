@@ -584,7 +584,7 @@ background: "#fafafa"
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "120px 160px minmax(260px, 1fr) 90px 120px 140px",
+gridTemplateColumns: "120px 160px minmax(260px, 1fr) 120px 90px 140px",
 gap: 12,
 alignItems: "start"
 }}
@@ -592,8 +592,8 @@ alignItems: "start"
 <div style={cellStyle}>{item.brand || "—"}</div>
 <div style={cellStyle}>{item.pn || "—"}</div>
 <div style={cellStyle}>{item.name || "—"}</div>
-<div style={cellStyle}>Кол-во: {item.order_qty || 0}</div>
 <div style={cellStyle}>Цена: {unitPrice}</div>
+<div style={cellStyle}>Шт: {item.order_qty || 0}</div>
 <div style={cellStyle}>Сумма: {itemTotal.toFixed(2)} BYN</div>
 </div>
 ) : (
@@ -608,6 +608,7 @@ alignItems: "start"
 <div style={cellStyle}>{item.brand || "—"}</div>
 <div style={cellStyle}>{item.pn || "—"}</div>
 <div style={cellStyle}>{item.name || "—"}</div>
+<div style={cellStyle}>{unitPrice}</div>
 
 <div style={cellStyle}>
 <input
@@ -628,7 +629,6 @@ boxSizing: "border-box"
 />
 </div>
 
-<div style={cellStyle}>{unitPrice}</div>
 <div style={cellStyle}>{itemTotal.toFixed(2)} BYN</div>
 
 <div>
@@ -801,8 +801,8 @@ boxSizing: "border-box"
 };
 
 const pageInnerStyle = {
-width: "100%",
-maxWidth: "80%",
+width: "80%",
+maxWidth: 1600,
 margin: "0 auto"
 };
 
