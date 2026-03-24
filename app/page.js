@@ -651,6 +651,11 @@ async function handleSubmitOrder() {
         >
           {loading ? "Ищу..." : "Поиск"}
         </button>
+          async function handleSearchClick() {
+  if (!canSearch) return;
+  await loadSearchBrands();
+  await runSearch(true);
+}
 
         <div style={{ color: "#666", fontSize: 13 }}>
           {rows.length > 0 ? `Загружено: ${rows.length}` : " "}
