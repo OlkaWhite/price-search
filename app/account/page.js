@@ -236,7 +236,7 @@ order_qty: Number(item.order_qty) || 1
 setEditingOrderId(orderId);
 }
 
-function cancelOrderEdit(orderId) {
+function cancelOrderEdit() {
 window.location.reload();
 }
 
@@ -555,7 +555,7 @@ cursor: savingOrderId === order.id ? "default" : "pointer"
 </button>
 
 <button
-onClick={() => cancelOrderEdit(order.id)}
+onClick={cancelOrderEdit}
 style={secondaryButtonStyle}
 >
 Отмена
@@ -565,9 +565,12 @@ style={secondaryButtonStyle}
 </div>
 </div>
 
-<div style={{ marginTop: 12 }}>
-<div style={{ display: "grid", gap: 8 }}>
-{(order.order_items || []).map((item) => (
+<div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+{(order.order_items || []).map((item) => {
+const itemTotal = calcItemTotal(item);
+const unitPrice = getUnitPrice(item);
+
+return (
 <div
 key={item.id}
 style={{
@@ -581,7 +584,7 @@ background: "#fafafa"
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "120px 160px minmax(260px, 1fr) 90px 110px",
+gridTemplateColumns: "120px 160px minmax(260px, 1fr) 90px 120px 140px",
 gap: 12,
 alignItems: "start"
 }}
@@ -590,13 +593,14 @@ alignItems: "start"
 <div style={cellStyle}>{item.pn || "—"}</div>
 <div style={cellStyle}>{item.name || "—"}</div>
 <div style={cellStyle}>Кол-во: {item.order_qty || 0}</div>
-<div style={cellStyle}>{item.display_price || "—"}</div>
+<div style={cellStyle}>Цена: {unitPrice}</div>
+<div style={cellStyle}>Сумма: {itemTotal.toFixed(2)} BYN</div>
 </div>
 ) : (
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "120px 160px minmax(220px, 1fr) 120px 110px 140px",
+gridTemplateColumns: "120px 160px minmax(220px, 1fr) 120px 120px 140px 140px",
 gap: 12,
 alignItems: "start"
 }}
@@ -624,7 +628,8 @@ boxSizing: "border-box"
 />
 </div>
 
-<div style={cellStyle}>{item.display_price || "—"}</div>
+<div style={cellStyle}>{unitPrice}</div>
+<div style={cellStyle}>{itemTotal.toFixed(2)} BYN</div>
 
 <div>
 <button
@@ -646,7 +651,8 @@ width: "100%"
 </div>
 )}
 </div>
-))}
+);
+})}
 </div>
 
 {(order.order_items || []).length === 0 ? (
@@ -654,7 +660,6 @@ width: "100%"
 В заявке не осталось позиций.
 </div>
 ) : null}
-</div>
 
 <div
 style={{
@@ -700,6 +705,15 @@ fontSize: 14
 </div>
 </div>
 );
+}
+
+function getUnitPrice(item) {
+const price =
+typeof item.price_byn === "number"
+? item.price_byn
+: Number(item.price_byn) || 0;
+
+return `${price.toFixed(2)} BYN`;
 }
 
 function calcItemTotal(item) {
