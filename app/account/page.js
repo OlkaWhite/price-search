@@ -21,10 +21,20 @@ const [savingOrderId, setSavingOrderId] = useState(null);
 const [errorText, setErrorText] = useState("");
 const [message, setMessage] = useState("");
 
+const [profileEditMode, setProfileEditMode] = useState(false);
+const [editingOrderId, setEditingOrderId] = useState(null);
+
 const [companyName, setCompanyName] = useState("");
 const [contactName, setContactName] = useState("");
 const [phone, setPhone] = useState("");
 const [telegram, setTelegram] = useState("");
+
+const [profileDraft, setProfileDraft] = useState({
+companyName: "",
+contactName: "",
+phone: "",
+telegram: ""
+});
 
 useEffect(() => {
 let mounted = true;
@@ -96,10 +106,22 @@ order_qty: Number(item.order_qty) || 1
 setProfile(profileData || null);
 setOrders(normalizedOrders);
 
-setCompanyName(profileData?.company_name || "");
-setContactName(profileData?.contact_name || "");
-setPhone(profileData?.phone || "");
-setTelegram(profileData?.telegram || "");
+const nextCompany = profileData?.company_name || "";
+const nextContact = profileData?.contact_name || "";
+const nextPhone = profileData?.phone || "";
+const nextTelegram = profileData?.telegram || "";
+
+setCompanyName(nextCompany);
+setContactName(nextContact);
+setPhone(nextPhone);
+setTelegram(nextTelegram);
+
+setProfileDraft({
+companyName: nextCompany,
+contactName: nextContact,
+phone: nextPhone,
+telegram: nextTelegram
+});
 } catch (err) {
 console.error("Account load error:", err);
 if (!mounted) return;
@@ -122,6 +144,26 @@ const totalAmount = orders.reduce((sum, order) => sum + calcOrderTotal(order), 0
 return { total, totalAmount };
 }, [orders]);
 
+function startProfileEdit() {
+setProfileDraft({
+companyName,
+contactName,
+phone,
+telegram
+});
+setProfileEditMode(true);
+}
+
+function cancelProfileEdit() {
+setProfileDraft({
+companyName,
+contactName,
+phone,
+telegram
+});
+setProfileEditMode(false);
+}
+
 async function handleSaveProfile(e) {
 e.preventDefault();
 
@@ -135,16 +177,34 @@ try {
 const payload = {
 id: sessionUser.id,
 email: sessionUser.email || null,
-company_name: companyName.trim() || null,
-contact_name: contactName.trim() || null,
-phone: phone.trim() || null,
-telegram: telegram.trim() || null
+company_name: profileDraft.companyName.trim() || null,
+contact_name: profileDraft.contactName.trim() || null,
+phone: profileDraft.phone.trim() || null,
+telegram: profileDraft.telegram.trim() || null
 };
 
 const { error } = await supabase.from("profiles").upsert(payload);
 
 if (error) throw error;
 
+setCompanyName(profileDraft.companyName);
+setContactName(profileDraft.contactName);
+setPhone(profileDraft.phone);
+setTelegram(profileDraft.telegram);
+
+setProfile((prev) =>
+prev
+? {
+...prev,
+company_name: profileDraft.companyName.trim() || null,
+contact_name: profileDraft.contactName.trim() || null,
+phone: profileDraft.phone.trim() || null,
+telegram: profileDraft.telegram.trim() || null
+}
+: prev
+);
+
+setProfileEditMode(false);
 setMessage("Данные профиля сохранены.");
 } catch (err) {
 console.error("Profile save error:", err);
@@ -157,6 +217,27 @@ setSavingProfile(false);
 async function handleLogout() {
 await supabase.auth.signOut();
 window.location.href = "/";
+}
+
+function startOrderEdit(orderId) {
+setOrders((prev) =>
+prev.map((order) =>
+order.id !== orderId
+? order
+: {
+...order,
+order_items: (order.order_items || []).map((item) => ({
+...item,
+order_qty: Number(item.order_qty) || 1
+}))
+}
+)
+);
+setEditingOrderId(orderId);
+}
+
+function cancelOrderEdit(orderId) {
+window.location.reload();
 }
 
 function changeItemQty(orderId, itemId, nextValue) {
@@ -229,12 +310,8 @@ const { error: deleteError } = await supabase
 if (deleteError) throw deleteError;
 }
 
+setEditingOrderId(null);
 setMessage(`Заявка #${order.id} сохранена.`);
-
-const refreshedOrders = orders.map((o) =>
-o.id === order.id ? { ...o, order_items: currentItems } : o
-);
-setOrders(refreshedOrders);
 } catch (err) {
 console.error("Order save error:", err);
 setErrorText(err?.message || "Не удалось сохранить заявку.");
@@ -308,8 +385,31 @@ color: "#9b1c1c"
 
 <div style={topGridStyle}>
 <div style={cardStyle}>
-<h2 style={{ marginTop: 0, marginBottom: 18 }}>Профиль</h2>
+<div
+style={{
+display: "flex",
+justifyContent: "space-between",
+gap: 12,
+alignItems: "center",
+marginBottom: 18,
+flexWrap: "wrap"
+}}
+>
+<h2 style={{ margin: 0 }}>Профиль</h2>
 
+{!profileEditMode ? (
+<button onClick={startProfileEdit} style={secondaryButtonStyle}>
+Редактировать
+</button>
+) : null}
+</div>
+
+{!profileEditMode ? (
+<div style={{ display: "grid", gap: 14 }}>
+<InfoRow label="Компания" value={companyName || "—"} />
+<InfoRow label="Контактное лицо" value={contactName || "—"} />
+</div>
+) : (
 <form onSubmit={handleSaveProfile} style={{ display: "grid", gap: 14 }}>
 <Field label="Email">
 <input
@@ -321,36 +421,45 @@ style={{ ...inputStyle, background: "#f8f8f8", color: "#666" }}
 
 <Field label="Компания">
 <input
-value={companyName}
-onChange={(e) => setCompanyName(e.target.value)}
+value={profileDraft.companyName}
+onChange={(e) =>
+setProfileDraft((prev) => ({ ...prev, companyName: e.target.value }))
+}
 style={inputStyle}
 />
 </Field>
 
 <Field label="Контактное лицо">
 <input
-value={contactName}
-onChange={(e) => setContactName(e.target.value)}
+value={profileDraft.contactName}
+onChange={(e) =>
+setProfileDraft((prev) => ({ ...prev, contactName: e.target.value }))
+}
 style={inputStyle}
 />
 </Field>
 
 <Field label="Телефон">
 <input
-value={phone}
-onChange={(e) => setPhone(e.target.value)}
+value={profileDraft.phone}
+onChange={(e) =>
+setProfileDraft((prev) => ({ ...prev, phone: e.target.value }))
+}
 style={inputStyle}
 />
 </Field>
 
 <Field label="Telegram">
 <input
-value={telegram}
-onChange={(e) => setTelegram(e.target.value)}
+value={profileDraft.telegram}
+onChange={(e) =>
+setProfileDraft((prev) => ({ ...prev, telegram: e.target.value }))
+}
 style={inputStyle}
 />
 </Field>
 
+<div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
 <button
 type="submit"
 disabled={savingProfile}
@@ -363,15 +472,25 @@ cursor: savingProfile ? "default" : "pointer"
 >
 {savingProfile ? "Сохраняю..." : "Сохранить"}
 </button>
+
+<button
+type="button"
+onClick={cancelProfileEdit}
+style={secondaryButtonStyle}
+>
+Отмена
+</button>
+</div>
 </form>
+)}
 </div>
 
 <div style={cardStyle}>
 <h2 style={{ marginTop: 0, marginBottom: 16 }}>Сводка</h2>
-<InfoRow label="Всего заявок" value={ordersStats.total} />
+<InfoRow label="Всего заявок" value={orders.length} />
 <InfoRow
 label="Общая сумма заявок"
-value={`${ordersStats.totalAmount.toFixed(2)} BYN`}
+value={`${orders.reduce((sum, order) => sum + calcOrderTotal(order), 0).toFixed(2)} BYN`}
 />
 </div>
 </div>
@@ -384,7 +503,10 @@ value={`${ordersStats.totalAmount.toFixed(2)} BYN`}
 <div style={{ color: "#666" }}>Заявок пока нет.</div>
 ) : (
 <div style={{ display: "grid", gap: 16 }}>
-{orders.map((order) => (
+{orders.map((order) => {
+const isEditing = editingOrderId === order.id;
+
+return (
 <div
 key={order.id}
 style={{
@@ -399,42 +521,153 @@ style={{
 display: "flex",
 justifyContent: "space-between",
 gap: 12,
-alignItems: "flex-start",
+alignItems: "center",
 flexWrap: "wrap"
 }}
 >
-<div>
 <div style={{ fontWeight: 700, fontSize: 18 }}>
-Заявка #{order.id}
+Заявка #{order.id} — {new Date(order.created_at).toLocaleString()}
 </div>
-<div style={{ color: "#666", fontSize: 13, marginTop: 4 }}>
-{new Date(order.created_at).toLocaleString()}
+
+<div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+<StatusBadge status={order.status} />
+
+{!isEditing ? (
+<button
+onClick={() => startOrderEdit(order.id)}
+style={secondaryButtonStyle}
+>
+Редактировать
+</button>
+) : (
+<>
+<button
+onClick={() => handleSaveOrder(order)}
+disabled={savingOrderId === order.id}
+style={{
+...primaryButtonStyle,
+background: savingOrderId === order.id ? "#ddd" : "#111",
+color: savingOrderId === order.id ? "#333" : "#fff",
+cursor: savingOrderId === order.id ? "default" : "pointer"
+}}
+>
+{savingOrderId === order.id ? "Сохраняю..." : "Сохранить"}
+</button>
+
+<button
+onClick={() => cancelOrderEdit(order.id)}
+style={secondaryButtonStyle}
+>
+Отмена
+</button>
+</>
+)}
 </div>
 </div>
 
-<StatusBadge status={order.status} />
+<div style={{ marginTop: 12 }}>
+<div style={{ display: "grid", gap: 8 }}>
+{(order.order_items || []).map((item) => (
+<div
+key={item.id}
+style={{
+border: "1px solid #eee",
+borderRadius: 12,
+padding: 12,
+background: "#fafafa"
+}}
+>
+{!isEditing ? (
+<div
+style={{
+display: "grid",
+gridTemplateColumns: "120px 160px minmax(260px, 1fr) 90px 110px",
+gap: 12,
+alignItems: "start"
+}}
+>
+<div style={cellStyle}>{item.brand || "—"}</div>
+<div style={cellStyle}>{item.pn || "—"}</div>
+<div style={cellStyle}>{item.name || "—"}</div>
+<div style={cellStyle}>Кол-во: {item.order_qty || 0}</div>
+<div style={cellStyle}>{item.display_price || "—"}</div>
+</div>
+) : (
+<div
+style={{
+display: "grid",
+gridTemplateColumns: "120px 160px minmax(220px, 1fr) 120px 110px 140px",
+gap: 12,
+alignItems: "start"
+}}
+>
+<div style={cellStyle}>{item.brand || "—"}</div>
+<div style={cellStyle}>{item.pn || "—"}</div>
+<div style={cellStyle}>{item.name || "—"}</div>
+
+<div style={cellStyle}>
+<input
+type="number"
+min="1"
+value={item.order_qty}
+onChange={(e) =>
+changeItemQty(order.id, item.id, e.target.value)
+}
+style={{
+width: "100%",
+padding: "8px 10px",
+border: "1px solid #ccc",
+borderRadius: 10,
+fontSize: 14,
+boxSizing: "border-box"
+}}
+/>
+</div>
+
+<div style={cellStyle}>{item.display_price || "—"}</div>
+
+<div>
+<button
+onClick={() => removeItemFromOrder(order.id, item.id)}
+style={{
+padding: "8px 10px",
+borderRadius: 10,
+border: "1px solid #e3b7b7",
+background: "#fff",
+color: "#a22",
+cursor: "pointer",
+fontSize: 13,
+width: "100%"
+}}
+>
+Удалить
+</button>
+</div>
+</div>
+)}
+</div>
+))}
+</div>
+
+{(order.order_items || []).length === 0 ? (
+<div style={{ marginTop: 12, color: "#a22", fontSize: 14 }}>
+В заявке не осталось позиций.
+</div>
+) : null}
 </div>
 
 <div
 style={{
 marginTop: 14,
-display: "grid",
-gap: 8
+display: "flex",
+justifyContent: "space-between",
+gap: 12,
+alignItems: "center",
+flexWrap: "wrap"
 }}
 >
-<InfoRow label="Контакт" value={order.customer_contact || "—"} />
-<InfoRow
-label="Комментарий к заявке"
-value={order.customer_comment || "—"}
-/>
-<InfoRow
-label="Комментарий менеджера"
-value={order.manager_comment || "—"}
-/>
-<InfoRow
-label="Сумма заказа"
-value={`${calcOrderTotal(order).toFixed(2)} BYN`}
-/>
+<div style={{ fontWeight: 700 }}>
+Общая сумма: {calcOrderTotal(order).toFixed(2)} BYN
 </div>
 
 {order.invoice_url ? (
@@ -444,7 +677,6 @@ target="_blank"
 rel="noopener noreferrer"
 style={{
 display: "inline-block",
-marginTop: 12,
 padding: "10px 12px",
 borderRadius: 10,
 border: "1px solid #111",
@@ -457,128 +689,10 @@ fontSize: 14
 Скачать счёт
 </a>
 ) : null}
-
-<div style={{ marginTop: 16 }}>
-<div
-style={{
-display: "flex",
-justifyContent: "space-between",
-alignItems: "center",
-gap: 12,
-flexWrap: "wrap",
-marginBottom: 10
-}}
->
-<div style={{ fontWeight: 700 }}>Позиции</div>
-
-<button
-onClick={() => handleSaveOrder(order)}
-disabled={savingOrderId === order.id}
-style={{
-...primaryButtonStyle,
-padding: "10px 12px",
-background: savingOrderId === order.id ? "#ddd" : "#111",
-color: savingOrderId === order.id ? "#333" : "#fff",
-cursor: savingOrderId === order.id ? "default" : "pointer"
-}}
->
-{savingOrderId === order.id ? "Сохраняю..." : "Сохранить изменения"}
-</button>
-</div>
-
-<div style={{ display: "grid", gap: 10 }}>
-{(order.order_items || []).map((item) => (
-<div
-key={item.id}
-style={{
-border: "1px solid #eee",
-borderRadius: 12,
-padding: 12,
-background: "#fafafa"
-}}
->
-<div
-style={{
-fontWeight: 700,
-overflowWrap: "anywhere",
-wordBreak: "break-word"
-}}
->
-{item.brand || "—"} {item.pn || ""}
-</div>
-
-<div
-style={{
-marginTop: 4,
-color: "#444",
-fontSize: 14,
-lineHeight: 1.4,
-overflowWrap: "anywhere",
-wordBreak: "break-word"
-}}
->
-{item.name || "—"}
-</div>
-
-<div
-style={{
-marginTop: 10,
-display: "flex",
-gap: 12,
-alignItems: "center",
-flexWrap: "wrap"
-}}
->
-<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-<span style={{ fontSize: 13, color: "#666" }}>Кол-во:</span>
-<input
-type="number"
-min="1"
-value={item.order_qty}
-onChange={(e) =>
-changeItemQty(order.id, item.id, e.target.value)
-}
-style={{
-width: 90,
-padding: "8px 10px",
-border: "1px solid #ccc",
-borderRadius: 10,
-fontSize: 14
-}}
-/>
-</div>
-
-<div style={{ fontSize: 13, color: "#666" }}>
-Цена: {item.display_price || "—"}
-</div>
-
-<button
-onClick={() => removeItemFromOrder(order.id, item.id)}
-style={{
-padding: "8px 10px",
-borderRadius: 10,
-border: "1px solid #e3b7b7",
-background: "#fff",
-color: "#a22",
-cursor: "pointer",
-fontSize: 13
-}}
->
-Удалить позицию
-</button>
 </div>
 </div>
-))}
-</div>
-
-{(order.order_items || []).length === 0 ? (
-<div style={{ marginTop: 12, color: "#a22", fontSize: 14 }}>
-В заявке не осталось позиций. Нажми «Сохранить изменения», чтобы зафиксировать.
-</div>
-) : null}
-</div>
-</div>
-))}
+);
+})}
 </div>
 )}
 </div>
@@ -703,12 +817,13 @@ boxSizing: "border-box"
 };
 
 const primaryButtonStyle = {
-padding: "12px 14px",
+padding: "10px 14px",
 borderRadius: 10,
 border: "1px solid #111",
 background: "#111",
 color: "#fff",
-fontSize: 14
+fontSize: 14,
+cursor: "pointer"
 };
 
 const secondaryButtonStyle = {
@@ -719,4 +834,11 @@ background: "#fff",
 color: "#111",
 cursor: "pointer",
 fontSize: 14
+};
+
+const cellStyle = {
+fontSize: 14,
+lineHeight: 1.4,
+overflowWrap: "anywhere",
+wordBreak: "break-word"
 };
