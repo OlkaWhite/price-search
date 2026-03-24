@@ -341,7 +341,7 @@ async function runSearch(reset = true) {
 }
 
 async function handleSearchClick() {
-  if (!canSearch  loading  loadingMore) return;
+  if (!canSearch || loading || loadingMore) return;
 
   setErrorText("");
   setPage(0);
