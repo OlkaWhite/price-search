@@ -10,6 +10,23 @@ processed: "Обработана",
 canceled: "Отменена"
 };
 
+function createEmptyItem(orderId) {
+return {
+id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+order_id: orderId,
+brand: "",
+pn: "",
+name: "",
+order_qty: 1,
+stock_qty: null,
+display_price: "По запросу",
+price_byn: 0,
+requested_price_byn: null,
+request_price_mode: false,
+isNew: true
+};
+}
+
 export default function AccountPage() {
 const [sessionUser, setSessionUser] = useState(null);
 const [profile, setProfile] = useState(null);
@@ -89,7 +106,8 @@ name,
 order_qty,
 stock_qty,
 display_price,
-price_byn
+price_byn,
+requested_price_byn
 )
 `)
 .eq("user_id", session.user.id)
@@ -103,7 +121,13 @@ const normalizedOrders = (ordersData || []).map((order) => ({
 ...order,
 order_items: (order.order_items || []).map((item) => ({
 ...item,
-order_qty: Number(item.order_qty) || 1
+order_qty: Number(item.order_qty) || 1,
+price_byn: Number(item.price_byn) || 0,
+requested_price_byn:
+item.requested_price_byn === null || item.requested_price_byn === undefined
+? null
+: Number(item.requested_price_byn) || 0,
+request_price_mode: false
 }))
 }));
 
@@ -240,7 +264,8 @@ order.id !== orderId
 ...order,
 order_items: (order.order_items || []).map((item) => ({
 ...item,
-order_qty: Number(item.order_qty) || 1
+order_qty: Number(item.order_qty) || 1,
+request_price_mode: item.requested_price_byn !== null
 }))
 }
 )
@@ -295,13 +320,72 @@ order_items: (order.order_items || []).filter((item) => item.id !== itemId)
 );
 }
 
+function addOrderItem(orderId) {
+setOrders((prev) =>
+prev.map((order) =>
+order.id !== orderId
+? order
+: {
+...order,
+order_items: [...(order.order_items || []), createEmptyItem(order.id)]
+}
+)
+);
+}
+
+function toggleRequestPrice(orderId, itemId) {
+setOrders((prev) =>
+prev.map((order) =>
+order.id !== orderId
+? order
+: {
+...order,
+order_items: (order.order_items || []).map((item) =>
+item.id !== itemId
+? item
+: {
+...item,
+request_price_mode: !item.request_price_mode
+}
+)
+}
+)
+);
+}
+
+function updateOrderItemField(orderId, itemId, field, value) {
+setOrders((prev) =>
+prev.map((order) =>
+order.id !== orderId
+? order
+: {
+...order,
+order_items: (order.order_items || []).map((item) => {
+if (item.id !== itemId) return item;
+
+if (field === "order_qty") {
+return { ...item, order_qty: Math.max(1, Number(value) || 1) };
+}
+
+if (field === "requested_price_byn") {
+return {
+...item,
+requested_price_byn: value === "" ? null : Number(value) || 0
+};
+}
+
+return { ...item, [field]: value };
+})
+}
+)
+);
+}
+
 async function handleSaveOrder(order) {
 try {
 setSavingOrderId(order.id);
 setErrorText("");
 setMessage("");
-
-const currentItems = order.order_items || [];
 
 const { error: orderUpdateError } = await supabase
 .from("orders")
@@ -312,6 +396,8 @@ customer_comment: order.customer_comment || null
 
 if (orderUpdateError) throw orderUpdateError;
 
+const currentItems = order.order_items || [];
+
 const { data: dbItems, error: readError } = await supabase
 .from("order_items")
 .select("id")
@@ -320,19 +406,60 @@ const { data: dbItems, error: readError } = await supabase
 if (readError) throw readError;
 
 const dbIds = (dbItems || []).map((x) => x.id);
-const currentIds = currentItems.map((x) => x.id);
-const idsToDelete = dbIds.filter((id) => !currentIds.includes(id));
+const existingItems = currentItems.filter((item) => !item.isNew);
+const newItems = currentItems.filter((item) => item.isNew);
 
-for (const item of currentItems) {
+const currentExistingIds = existingItems.map((x) => x.id);
+const idsToDelete = dbIds.filter((id) => !currentExistingIds.includes(id));
+
+for (const item of existingItems) {
 const { error: updateError } = await supabase
 .from("order_items")
 .update({
-order_qty: Number(item.order_qty) || 1
+brand: item.brand || null,
+pn: item.pn || null,
+name: item.name || null,
+order_qty: Number(item.order_qty) || 1,
+price_byn: Number(item.price_byn) || 0,
+display_price:
+Number(item.price_byn) > 0
+? `${Number(item.price_byn).toFixed(2)} BYN`
+: "По запросу",
+requested_price_byn:
+item.requested_price_byn === null || item.requested_price_byn === ""
+? null
+: Number(item.requested_price_byn) || 0
 })
 .eq("id", item.id)
 .eq("order_id", order.id);
 
 if (updateError) throw updateError;
+}
+
+if (newItems.length > 0) {
+const insertPayload = newItems.map((item) => ({
+order_id: order.id,
+brand: item.brand || null,
+pn: item.pn || null,
+name: item.name || null,
+order_qty: Number(item.order_qty) || 1,
+stock_qty: item.stock_qty || null,
+price_byn: Number(item.price_byn) || 0,
+display_price:
+Number(item.price_byn) > 0
+? `${Number(item.price_byn).toFixed(2)} BYN`
+: "По запросу",
+requested_price_byn:
+item.requested_price_byn === null || item.requested_price_byn === ""
+? null
+: Number(item.requested_price_byn) || 0
+}));
+
+const { error: insertError } = await supabase
+.from("order_items")
+.insert(insertPayload);
+
+if (insertError) throw insertError;
 }
 
 if (idsToDelete.length > 0) {
@@ -673,10 +800,35 @@ boxSizing: "border-box"
 </div>
 ) : null}
 
+<div
+style={{
+marginTop: 12,
+display: "flex",
+justifyContent: "space-between",
+gap: 12,
+alignItems: "center",
+flexWrap: "wrap"
+}}
+>
+<div style={{ fontWeight: 700 }}>Позиции</div>
+
+{isEditing ? (
+<button
+onClick={() => addOrderItem(order.id)}
+style={secondaryButtonStyle}
+>
+Добавить позицию
+</button>
+) : null}
+</div>
+
 <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
 {(order.order_items || []).map((item) => {
 const itemTotal = calcItemTotal(item);
-const unitPrice = getUnitPrice(item);
+const unitPrice =
+Number(item.price_byn) > 0
+? `${Number(item.price_byn).toFixed(2)} BYN`
+: "По запросу";
 
 return (
 <div
@@ -692,7 +844,7 @@ background: "#fafafa"
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "120px 160px minmax(260px, 1fr) 120px 90px 140px",
+gridTemplateColumns: "120px 160px minmax(260px, 1fr) 120px 90px 140px 150px",
 gap: 12,
 alignItems: "start"
 }}
@@ -703,19 +855,48 @@ alignItems: "start"
 <div style={cellStyle}>Цена: {unitPrice}</div>
 <div style={cellStyle}>Шт: {item.order_qty || 0}</div>
 <div style={cellStyle}>Сумма: {itemTotal.toFixed(2)} BYN</div>
+<div style={cellStyle}>
+{item.requested_price_byn !== null && item.requested_price_byn !== undefined
+? `Цена клиента: ${Number(item.requested_price_byn).toFixed(2)} BYN`
+: "—"}
+</div>
 </div>
 ) : (
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "120px 160px minmax(220px, 1fr) 120px 120px 140px 140px",
+gridTemplateColumns: "120px 160px minmax(220px, 1fr) 120px 120px 170px 140px",
 gap: 12,
 alignItems: "start"
 }}
 >
-<div style={cellStyle}>{item.brand || "—"}</div>
-<div style={cellStyle}>{item.pn || "—"}</div>
-<div style={cellStyle}>{item.name || "—"}</div>
+<input
+value={item.brand || ""}
+onChange={(e) =>
+updateOrderItemField(order.id, item.id, "brand", e.target.value)
+}
+style={cellInputStyle}
+placeholder="Бренд"
+/>
+
+<input
+value={item.pn || ""}
+onChange={(e) =>
+updateOrderItemField(order.id, item.id, "pn", e.target.value)
+}
+style={cellInputStyle}
+placeholder="P/N"
+/>
+
+<input
+value={item.name || ""}
+onChange={(e) =>
+updateOrderItemField(order.id, item.id, "name", e.target.value)
+}
+style={cellInputStyle}
+placeholder="Наименование"
+/>
+
 <div style={cellStyle}>{unitPrice}</div>
 
 <div style={cellStyle}>
@@ -724,22 +905,43 @@ type="number"
 min="1"
 value={item.order_qty}
 onChange={(e) =>
-changeItemQty(order.id, item.id, e.target.value)
+updateOrderItemField(order.id, item.id, "order_qty", e.target.value)
 }
-style={{
-width: "100%",
-padding: "8px 10px",
-border: "1px solid #ccc",
-borderRadius: 10,
-fontSize: 14,
-boxSizing: "border-box"
-}}
+style={cellInputStyle}
 />
 </div>
 
-<div style={cellStyle}>{itemTotal.toFixed(2)} BYN</div>
-
 <div>
+<button
+onClick={() => toggleRequestPrice(order.id, item.id)}
+style={secondaryButtonStyle}
+>
+Запросить цену
+</button>
+
+{(item.request_price_mode || item.requested_price_byn !== null) && (
+<input
+type="number"
+min="0"
+step="0.01"
+value={item.requested_price_byn ?? ""}
+onChange={(e) =>
+updateOrderItemField(
+order.id,
+item.id,
+"requested_price_byn",
+e.target.value
+)
+}
+placeholder="Ваша цена"
+style={{
+...cellInputStyle,
+marginTop: 8
+}}
+/>
+)}
+</div>
+
 <button
 onClick={() => removeItemFromOrder(order.id, item.id)}
 style={{
@@ -755,7 +957,6 @@ width: "100%"
 >
 Удалить
 </button>
-</div>
 </div>
 )}
 </div>
@@ -823,26 +1024,9 @@ cursor: savingOrderId === order.id ? "default" : "pointer"
 );
 }
 
-function getUnitPrice(item) {
-const price =
-typeof item.price_byn === "number"
-? item.price_byn
-: Number(item.price_byn) || 0;
-
-return `${price.toFixed(2)} BYN`;
-}
-
 function calcItemTotal(item) {
-const price =
-typeof item.price_byn === "number"
-? item.price_byn
-: Number(item.price_byn) || 0;
-
-const qty =
-typeof item.order_qty === "number"
-? item.order_qty
-: Number(item.order_qty) || 0;
-
+const price = Number(item.price_byn) || 0;
+const qty = Number(item.order_qty) || 0;
 return price * qty;
 }
 
@@ -940,6 +1124,15 @@ minWidth: 0
 const inputStyle = {
 width: "100%",
 padding: "10px 12px",
+border: "1px solid #ccc",
+borderRadius: 10,
+fontSize: 14,
+boxSizing: "border-box"
+};
+
+const cellInputStyle = {
+width: "100%",
+padding: "8px 10px",
 border: "1px solid #ccc",
 borderRadius: 10,
 fontSize: 14,
