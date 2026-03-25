@@ -24,6 +24,7 @@ order_qty: 1,
 stock_qty: null,
 display_price: "",
 price_byn: 0,
+requested_price_byn: null,
 isNew: true
 };
 }
@@ -69,7 +70,8 @@ name,
 order_qty,
 stock_qty,
 display_price,
-price_byn
+price_byn,
+requested_price_byn
 )
 `)
 .order("created_at", { ascending: false });
@@ -106,6 +108,10 @@ order_items: (order.order_items || []).map((item) => ({
 ...item,
 order_qty: Number(item.order_qty) || 1,
 price_byn: Number(item.price_byn) || 0,
+requested_price_byn:
+item.requested_price_byn === null || item.requested_price_byn === undefined
+? null
+: Number(item.requested_price_byn) || 0,
 display_price: item.display_price || formatPriceDisplay(item.price_byn)
 })),
 profile: profilesMap[order.user_id] || null
@@ -156,6 +162,10 @@ order_items: (order.order_items || []).map((item) => ({
 ...item,
 order_qty: Number(item.order_qty) || 1,
 price_byn: Number(item.price_byn) || 0,
+requested_price_byn:
+item.requested_price_byn === null || item.requested_price_byn === undefined
+? null
+: Number(item.requested_price_byn) || 0,
 display_price: item.display_price || formatPriceDisplay(item.price_byn)
 }))
 });
@@ -181,6 +191,13 @@ return {
 ...item,
 price_byn: nextPrice,
 display_price: formatPriceDisplay(nextPrice)
+};
+}
+
+if (field === "requested_price_byn") {
+return {
+...item,
+requested_price_byn: value === "" ? null : Number(value) || 0
 };
 }
 
@@ -250,7 +267,11 @@ pn: item.pn || null,
 name: item.name || null,
 order_qty: normalizedQty,
 price_byn: normalizedPrice,
-display_price: formatPriceDisplay(normalizedPrice)
+display_price: formatPriceDisplay(normalizedPrice),
+requested_price_byn:
+item.requested_price_byn === null || item.requested_price_byn === ""
+? null
+: Number(item.requested_price_byn) || 0
 })
 .eq("id", item.id)
 .eq("order_id", selectedOrder.id);
@@ -271,7 +292,11 @@ name: item.name || null,
 order_qty: normalizedQty,
 stock_qty: item.stock_qty || null,
 price_byn: normalizedPrice,
-display_price: formatPriceDisplay(normalizedPrice)
+display_price: formatPriceDisplay(normalizedPrice),
+requested_price_byn:
+item.requested_price_byn === null || item.requested_price_byn === ""
+? null
+: Number(item.requested_price_byn) || 0
 };
 });
 
@@ -336,10 +361,7 @@ fontSize: 14
 ))}
 </select>
 
-<button
-onClick={loadOrders}
-style={mainButtonStyle}
->
+<button onClick={loadOrders} style={mainButtonStyle}>
 Обновить
 </button>
 </div>
@@ -410,10 +432,7 @@ fontSize: 14
 "Сумма",
 ""
 ].map((h) => (
-<th
-key={h}
-style={thStyle}
->
+<th key={h} style={thStyle}>
 {h}
 </th>
 ))}
@@ -470,10 +489,7 @@ falseTone="danger"
 <td style={tdStyle}>{itemsCount}</td>
 <td style={tdStyle}>{calcOrderTotal(order).toFixed(2)} BYN</td>
 <td style={tdStyle}>
-<button
-onClick={() => openOrder(order)}
-style={smallButtonStyle}
->
+<button onClick={() => openOrder(order)} style={smallButtonStyle}>
 Открыть
 </button>
 </td>
@@ -551,20 +567,51 @@ background: "#fafafa"
 }}
 >
 <div style={{ display: "grid", gap: 10 }}>
-<CompactInfo label="Дата" value={new Date(selectedOrder.created_at).toLocaleString()} />
-<CompactInfo label="Контактное лицо" value={selectedOrder.profile?.contact_name || selectedOrder.customer_name || "—"} />
-<CompactInfo label="Компания" value={selectedOrder.profile?.company_name || "—"} />
+<CompactInfo
+label="Дата"
+value={new Date(selectedOrder.created_at).toLocaleString()}
+/>
+<CompactInfo
+label="Контактное лицо"
+value={
+selectedOrder.profile?.contact_name ||
+selectedOrder.customer_name ||
+"—"
+}
+/>
+<CompactInfo
+label="Компания"
+value={selectedOrder.profile?.company_name || "—"}
+/>
 <CompactInfo label="УНП" value={selectedOrder.profile?.unp || "—"} />
-<CompactInfo label="Телефон" value={selectedOrder.profile?.phone || selectedOrder.customer_contact || "—"} />
-<CompactInfo label="Telegram" value={selectedOrder.profile?.telegram || "—"} />
-<CompactInfo label="E-mail" value={selectedOrder.profile?.email || "—"} />
-<CompactInfo label="Сумма заказа" value={`${calcOrderTotal(selectedOrder).toFixed(2)} BYN`} />
+<CompactInfo
+label="Телефон"
+value={
+selectedOrder.profile?.phone ||
+selectedOrder.customer_contact ||
+"—"
+}
+/>
+<CompactInfo
+label="Telegram"
+value={selectedOrder.profile?.telegram || "—"}
+/>
+<CompactInfo
+label="E-mail"
+value={selectedOrder.profile?.email || "—"}
+/>
+<CompactInfo
+label="Сумма заказа"
+value={`${calcOrderTotal(selectedOrder).toFixed(2)} BYN`}
+/>
+
 <div>
 <div style={compactLabelStyle}>Статус</div>
 <div style={{ marginTop: 4 }}>
 <StatusBadge status={selectedOrder.status} />
 </div>
 </div>
+
 <div>
 <div style={compactLabelStyle}>Счёт запрошен</div>
 <div style={{ marginTop: 4 }}>
@@ -572,11 +619,16 @@ background: "#fafafa"
 value={selectedOrder.invoice_requested}
 trueLabel="Да"
 falseLabel="Нет"
-trueTone={selectedOrder.invoice_requested && selectedOrder.invoice_url ? "success" : "danger"}
+trueTone={
+selectedOrder.invoice_requested && selectedOrder.invoice_url
+? "success"
+: "danger"
+}
 falseTone="neutral"
 />
 </div>
 </div>
+
 <div>
 <div style={compactLabelStyle}>Счёт выставлен</div>
 <div style={{ marginTop: 4 }}>
@@ -610,7 +662,9 @@ style={fullControlStyle}
 <div style={sectionTitleStyle}>Комментарий менеджера</div>
 <textarea
 value={selectedOrder.manager_comment || ""}
-onChange={(e) => updateSelectedOrderField("manager_comment", e.target.value)}
+onChange={(e) =>
+updateSelectedOrderField("manager_comment", e.target.value)
+}
 rows={4}
 style={{
 ...fullControlStyle,
@@ -623,7 +677,9 @@ resize: "vertical"
 <div style={sectionTitleStyle}>Ссылка на счёт</div>
 <input
 value={selectedOrder.invoice_url || ""}
-onChange={(e) => updateSelectedOrderField("invoice_url", e.target.value)}
+onChange={(e) =>
+updateSelectedOrderField("invoice_url", e.target.value)
+}
 placeholder="https://..."
 style={fullControlStyle}
 />
@@ -667,10 +723,7 @@ flexWrap: "wrap"
 >
 <h3 style={{ margin: 0 }}>Позиции заказа</h3>
 
-<button
-onClick={addOrderItem}
-style={smallButtonStyle}
->
+<button onClick={addOrderItem} style={smallButtonStyle}>
 Добавить позицию
 </button>
 </div>
@@ -678,7 +731,8 @@ style={smallButtonStyle}
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "120px 170px minmax(260px, 1fr) 90px 120px 130px 130px",
+gridTemplateColumns:
+"120px 170px minmax(240px, 1fr) 90px 120px 130px 140px 130px",
 gap: 12,
 alignItems: "center",
 padding: "0 12px 10px",
@@ -697,6 +751,7 @@ letterSpacing: "0.02em"
 <div>Шт</div>
 <div>Цена</div>
 <div>Сумма</div>
+<div>Цена клиента</div>
 <div></div>
 </div>
 
@@ -717,28 +772,35 @@ background: "#fafafa"
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "120px 170px minmax(260px, 1fr) 90px 120px 130px 130px",
+gridTemplateColumns:
+"120px 170px minmax(240px, 1fr) 90px 120px 130px 140px 130px",
 gap: 12,
 alignItems: "start"
 }}
 >
 <input
 value={item.brand || ""}
-onChange={(e) => updateOrderItem(item.id, "brand", e.target.value)}
+onChange={(e) =>
+updateOrderItem(item.id, "brand", e.target.value)
+}
 style={cellInputStyle}
 placeholder="Бренд"
 />
 
 <input
 value={item.pn || ""}
-onChange={(e) => updateOrderItem(item.id, "pn", e.target.value)}
+onChange={(e) =>
+updateOrderItem(item.id, "pn", e.target.value)
+}
 style={cellInputStyle}
 placeholder="P/N"
 />
 
 <input
 value={item.name || ""}
-onChange={(e) => updateOrderItem(item.id, "name", e.target.value)}
+onChange={(e) =>
+updateOrderItem(item.id, "name", e.target.value)
+}
 style={cellInputStyle}
 placeholder="Наименование"
 />
@@ -747,7 +809,9 @@ placeholder="Наименование"
 type="number"
 min="1"
 value={item.order_qty}
-onChange={(e) => updateOrderItem(item.id, "order_qty", e.target.value)}
+onChange={(e) =>
+updateOrderItem(item.id, "order_qty", e.target.value)
+}
 style={cellInputStyle}
 />
 
@@ -756,12 +820,21 @@ type="number"
 min="0"
 step="0.01"
 value={item.price_byn}
-onChange={(e) => updateOrderItem(item.id, "price_byn", e.target.value)}
+onChange={(e) =>
+updateOrderItem(item.id, "price_byn", e.target.value)
+}
 style={cellInputStyle}
 />
 
 <div style={itemCellStyle}>
 {calcItemTotal(item).toFixed(2)} BYN
+</div>
+
+<div style={itemCellStyle}>
+{item.requested_price_byn !== null &&
+item.requested_price_byn !== undefined
+? `${Number(item.requested_price_byn).toFixed(2)} BYN`
+: "—"}
 </div>
 
 <button
