@@ -255,6 +255,10 @@ await supabase.auth.signOut();
 window.location.href = "/";
 }
 
+function isOrderLocked(order) {
+return !!order.invoice_url && order.status === "processed";
+}
+
 function startOrderEdit(orderId) {
 setOrders((prev) =>
 prev.map((order) =>
@@ -705,31 +709,60 @@ value={`${orders.reduce((sum, order) => sum + calcOrderTotal(order), 0).toFixed(
 {orders.map((order) => {
 const isEditing = editingOrderId === order.id;
 const hasInvoice = !!order.invoice_url;
+const locked = isOrderLocked(order);
 
 return (
 <div
 key={order.id}
 style={{
-border: "1px solid #e9e9e9",
+border: "1px solid #e6e3dc",
 borderRadius: 14,
 padding: 16,
-background: "#fff"
+background: "#f7f6f2"
 }}
 >
 <div
 style={{
-display: "flex",
-justifyContent: "space-between",
+display: "grid",
+gridTemplateColumns: "minmax(320px, 1fr) minmax(240px, 380px) auto",
 gap: 12,
-alignItems: "flex-start",
-flexWrap: "wrap"
+alignItems: "start"
 }}
 >
-<div style={{ fontWeight: 700, fontSize: 18, flex: "1 1 420px" }}>
+<div style={{ fontWeight: 700, fontSize: 18 }}>
 Заявка #{order.id} — {new Date(order.created_at).toLocaleString()}
 </div>
 
-<div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+{isEditing ? (
+<textarea
+value={order.customer_comment || ""}
+onChange={(e) => changeOrderComment(order.id, e.target.value)}
+placeholder="Комментарий к заявке"
+rows={2}
+style={{
+width: "100%",
+maxWidth: 380,
+padding: "10px 12px",
+border: "1px solid #ccc",
+borderRadius: 10,
+fontSize: 14,
+resize: "vertical",
+boxSizing: "border-box"
+}}
+/>
+) : (
+<div style={{ maxWidth: 380 }}>
+{order.customer_comment ? (
+<InfoRow label="Комментарий к заявке" value={order.customer_comment} />
+) : (
+<div style={{ fontSize: 13, color: "#888", paddingTop: 4 }}>
+Без комментария
+</div>
+)}
+</div>
+)}
+
+<div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
 <StatusBadge status={order.status} />
 
 {hasInvoice ? (
@@ -775,31 +808,6 @@ requestingInvoiceId === order.id || order.invoice_requested
 </div>
 </div>
 
-{isEditing ? (
-<div style={{ marginTop: 12 }}>
-<textarea
-value={order.customer_comment || ""}
-onChange={(e) => changeOrderComment(order.id, e.target.value)}
-placeholder="Комментарий к заявке"
-rows={3}
-style={{
-width: "100%",
-maxWidth: 380,
-padding: "10px 12px",
-border: "1px solid #ccc",
-borderRadius: 10,
-fontSize: 14,
-resize: "vertical",
-boxSizing: "border-box"
-}}
-/>
-</div>
-) : order.customer_comment ? (
-<div style={{ marginTop: 12, maxWidth: 380 }}>
-<InfoRow label="Комментарий к заявке" value={order.customer_comment} />
-</div>
-) : null}
-
 <div
 style={{
 marginTop: 12,
@@ -814,8 +822,14 @@ flexWrap: "wrap"
 
 {isEditing ? (
 <button
-onClick={() => addOrderItem(order.id)}
-style={secondaryButtonStyle}
+disabled
+style={{
+...secondaryButtonStyle,
+border: "1px solid #ddd",
+background: "#f2f2f2",
+color: "#999",
+cursor: "not-allowed"
+}}
 >
 Добавить позицию
 </button>
@@ -834,17 +848,17 @@ return (
 <div
 key={item.id}
 style={{
-border: "1px solid #eee",
+border: "1px solid #ece7dd",
 borderRadius: 12,
 padding: 12,
-background: "#fafafa"
+background: "#fcfbf8"
 }}
 >
 {!isEditing ? (
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "120px 160px minmax(260px, 1fr) 120px 90px 140px 150px",
+gridTemplateColumns: "120px 160px minmax(260px, 1fr) 120px 90px 140px 160px",
 gap: 12,
 alignItems: "start"
 }}
@@ -985,12 +999,27 @@ flexWrap: "wrap"
 </div>
 
 {!isEditing ? (
+locked ? (
+<button
+disabled
+style={{
+...secondaryButtonStyle,
+border: "1px solid #ddd",
+background: "#f2f2f2",
+color: "#999",
+cursor: "not-allowed"
+}}
+>
+Редактирование недоступно
+</button>
+) : (
 <button
 onClick={() => startOrderEdit(order.id)}
 style={secondaryButtonStyle}
 >
 Редактировать
 </button>
+)
 ) : (
 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
 <button
