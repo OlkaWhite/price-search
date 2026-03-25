@@ -91,16 +91,38 @@ selectedSupplier.usd_discount_pct === null
 : Number(selectedSupplier.usd_discount_pct)
 };
 
-const { error } = await supabase
+console.log("SUPPLIER SAVE PAYLOAD", payload);
+
+const { data, error } = await supabase
 .from("pricelists")
 .update(payload)
-.eq("id", selectedSupplier.id);
+.eq("id", selectedSupplier.id)
+.select(`
+id,
+supplier,
+name,
+price_type,
+is_active,
+use_global_rates,
+fx_rate,
+usd_to_rub_rate,
+markup_pct,
+rub_discount_pct,
+usd_discount_pct,
+uploaded_at
+`)
+.single();
 
 if (error) {
+console.error("Save supplier error:", error);
 setErrorText(error.message);
 } else {
 setMessage(`Поставщик #${selectedSupplier.id} сохранён.`);
-await loadSuppliers();
+setSelectedSupplier(data);
+
+setSuppliers((prev) =>
+prev.map((item) => (item.id === data.id ? data : item))
+);
 }
 
 setSaving(false);
