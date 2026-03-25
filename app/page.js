@@ -438,11 +438,25 @@ function getRowKey(r) {
 return `${r.brand || ""}__${r.pn || ""}__${r.name || ""}`;
 }
 
-function getDisplayPrice(r) {
-if (typeof r.price_byn === "number") return `${r.price_byn.toFixed(2)} BYN`;
-if (r.price_rub && String(r.price_rub).trim() !== "") return String(r.price_rub);
-if (r.price_usd && String(r.price_usd).trim() !== "") return String(r.price_usd);
-return "";
+//function getDisplayPrice(r) {
+//if (typeof r.price_byn === "number") return `${r.price_byn.toFixed(2)} BYN`;
+//if (r.price_rub && String(r.price_rub).trim() !== "") return String(r.price_rub);
+//if (r.price_usd && String(r.price_usd).trim() !== "") return String(r.price_usd);
+//return "";
+//}
+
+  function getDisplayPrice(r) {
+  if (typeof r.price_byn === "number") {
+    return `${r.price_byn.toLocaleString('ru-RU', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} BYN`;
+  }
+
+  if (r.price_rub && String(r.price_rub).trim() !== "") return String(r.price_rub);
+  if (r.price_usd && String(r.price_usd).trim() !== "") return String(r.price_usd);
+
+  return "";
 }
 
 function isInCart(r) {
