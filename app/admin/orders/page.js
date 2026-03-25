@@ -324,6 +324,41 @@ setSaving(false);
 }
 }
 
+async function handleDeleteOrder(orderId) {
+const ok = window.confirm(
+`Удалить заказ #${orderId} полностью? Это удалит и все позиции заказа.`
+);
+
+if (!ok) return;
+
+setSaving(true);
+
+try {
+const { error: itemsError } = await supabase
+.from("order_items")
+.delete()
+.eq("order_id", orderId);
+
+if (itemsError) throw itemsError;
+
+const { error: orderError } = await supabase
+.from("orders")
+.delete()
+.eq("id", orderId);
+
+if (orderError) throw orderError;
+
+setOrders((prev) => prev.filter((order) => order.id !== orderId));
+setSelectedOrder(null);
+alert(`Заказ #${orderId} удалён.`);
+} catch (error) {
+console.error("handleDeleteOrder error:", error);
+alert("Ошибка при удалении: " + (error?.message || "неизвестная ошибка"));
+} finally {
+setSaving(false);
+}
+}
+
 return (
 <div>
 <div
@@ -685,7 +720,7 @@ style={fullControlStyle}
 />
 </div>
 
-<div style={{ marginTop: 18 }}>
+<div style={{ marginTop: 18, display: "flex", gap: 10, flexWrap: "wrap" }}>
 <button
 onClick={saveOrderUpdates}
 disabled={saving}
@@ -697,6 +732,22 @@ cursor: saving ? "default" : "pointer"
 }}
 >
 {saving ? "Сохраняю..." : "Сохранить изменения"}
+</button>
+
+<button
+onClick={() => handleDeleteOrder(selectedOrder.id)}
+disabled={saving}
+style={{
+padding: "10px 14px",
+borderRadius: 10,
+border: "1px solid #c62828",
+background: "#fff",
+color: "#c62828",
+cursor: saving ? "default" : "pointer",
+fontSize: 14
+}}
+>
+Удалить заказ
 </button>
 </div>
 </div>
