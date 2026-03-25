@@ -696,7 +696,7 @@ tableLayout: "fixed"
 <col style={{ width: "80px" }} />
 <col style={{ width: "120px" }} />
 <col style={{ width: "90px" }} />
-{isAdmin ? <col style={{ width: "140px" }} /> : null}
+{sessionUser ? <col style={{ width: "180px" }} /> : null}
 {sessionUser ? <col style={{ width: "130px" }} /> : null}
 </colgroup>
 
@@ -709,7 +709,7 @@ tableLayout: "fixed"
 "Кол-во",
 "Цена (BYN)",
 "Обновлён",
-...(isAdmin ? ["Поставщик"] : []),
+...(sessionUser ? ["Прайс"] : []),
 ...(sessionUser ? ["Действие"] : [])
 ].map((h) => (
 <th
@@ -812,7 +812,7 @@ verticalAlign: "top"
 {formatUpdateDate(r.last_upload_at)}
 </td>
 
-{isAdmin ? (
+{sessionUser ? (
 <td
 style={{
 padding: "8px",
@@ -821,7 +821,7 @@ whiteSpace: "normal",
 verticalAlign: "top"
 }}
 >
-{r.supplier || "—"}
+{r.pricelist_name || "—"}
 </td>
 ) : null}
 
@@ -857,7 +857,7 @@ width: "100%"
 {rows.length === 0 && (
 <tr>
 <td
-colSpan={6 + (isAdmin ? 1 : 0) + (sessionUser ? 1 : 0)}
+colSpan={6 + (sessionUser ? 2 : 0)}
 style={{ padding: "14px 8px", color: "#666" }}
 >
 {canSearch
