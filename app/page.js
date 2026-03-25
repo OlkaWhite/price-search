@@ -653,7 +653,7 @@ tableLayout: "fixed"
 <col style={{ width: "80px" }} />
 <col style={{ width: "120px" }} />
 <col style={{ width: "90px" }} />
-<col style={{ width: "130px" }} />
+{sessionUser ? <col style={{ width: "130px" }} /> : null}
 </colgroup>
 
 <thead>
@@ -665,7 +665,7 @@ tableLayout: "fixed"
 "Кол-во",
 "Цена (BYN)",
 "Обновлён",
-"Действие"
+...(sessionUser ? ["Действие"] : [])
 ].map((h) => (
 <th
 key={h}
@@ -767,6 +767,7 @@ verticalAlign: "top"
 {formatUpdateDate(r.last_upload_at)}
 </td>
 
+{sessionUser ? (
 <td
 style={{
 padding: "8px",
@@ -774,7 +775,6 @@ borderBottom: "1px solid #eee",
 verticalAlign: "top"
 }}
 >
-{sessionUser ? (
 <button
 onClick={() => addToCart(r)}
 style={{
@@ -790,34 +790,15 @@ width: "100%"
 >
 {added ? "Добавлено" : "В заказ"}
 </button>
-) : (
-<a
-href="/login"
-style={{
-display: "inline-block",
-width: "100%",
-boxSizing: "border-box",
-padding: "8px 10px",
-borderRadius: 10,
-border: "1px solid #ccc",
-background: "#fff",
-color: "#111",
-textDecoration: "none",
-textAlign: "center",
-fontSize: 13
-}}
->
-Войти для заказа
-</a>
-)}
 </td>
+) : null}
 </tr>
 );
 })}
 
 {rows.length === 0 && (
 <tr>
-<td colSpan={7} style={{ padding: "14px 8px", color: "#666" }}>
+<td colSpan={sessionUser ? 7 : 6} style={{ padding: "14px 8px", color: "#666" }}>
 {canSearch
 ? loading
 ? "Идёт поиск..."
