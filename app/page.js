@@ -31,6 +31,7 @@ const [customerContact, setCustomerContact] = useState("");
 const [customerComment, setCustomerComment] = useState("");
 
 const [sessionUser, setSessionUser] = useState(null);
+const [isAdmin, setIsAdmin] = useState(false);
 
 const lastLoggedSearchRef = useRef("");
 
@@ -46,6 +47,7 @@ if (!mounted) return;
 
 if (!session?.user) {
 setSessionUser(null);
+setIsAdmin(false);
 return;
 }
 
@@ -53,11 +55,13 @@ setSessionUser(session.user);
 
 const { data: profile } = await supabase
 .from("profiles")
-.select("contact_name, phone, telegram, email")
+.select("contact_name, phone, telegram, email, role")
 .eq("id", session.user.id)
 .maybeSingle();
 
 if (!mounted) return;
+
+setIsAdmin(profile?.role === "admin");
 
 if (profile) {
 if (profile.contact_name) setCustomerName(profile.contact_name);
@@ -85,6 +89,7 @@ if (!mounted) return;
 
 if (!session?.user) {
 setSessionUser(null);
+setIsAdmin(false);
 return;
 }
 
@@ -92,11 +97,13 @@ setSessionUser(session.user);
 
 const { data: profile } = await supabase
 .from("profiles")
-.select("contact_name, phone, telegram, email")
+.select("contact_name, phone, telegram, email, role")
 .eq("id", session.user.id)
 .maybeSingle();
 
 if (!mounted) return;
+
+setIsAdmin(profile?.role === "admin");
 
 if (profile) {
 if (profile.contact_name) setCustomerName(profile.contact_name);
@@ -689,6 +696,7 @@ tableLayout: "fixed"
 <col style={{ width: "80px" }} />
 <col style={{ width: "120px" }} />
 <col style={{ width: "90px" }} />
+{isAdmin ? <col style={{ width: "140px" }} /> : null}
 {sessionUser ? <col style={{ width: "130px" }} /> : null}
 </colgroup>
 
@@ -701,6 +709,7 @@ tableLayout: "fixed"
 "Кол-во",
 "Цена (BYN)",
 "Обновлён",
+...(isAdmin ? ["Поставщик"] : []),
 ...(sessionUser ? ["Действие"] : [])
 ].map((h) => (
 <th
@@ -803,6 +812,19 @@ verticalAlign: "top"
 {formatUpdateDate(r.last_upload_at)}
 </td>
 
+{isAdmin ? (
+<td
+style={{
+padding: "8px",
+borderBottom: "1px solid #eee",
+whiteSpace: "normal",
+verticalAlign: "top"
+}}
+>
+{r.supplier || "—"}
+</td>
+) : null}
+
 {sessionUser ? (
 <td
 style={{
@@ -834,7 +856,10 @@ width: "100%"
 
 {rows.length === 0 && (
 <tr>
-<td colSpan={sessionUser ? 7 : 6} style={{ padding: "14px 8px", color: "#666" }}>
+<td
+colSpan={6 + (isAdmin ? 1 : 0) + (sessionUser ? 1 : 0)}
+style={{ padding: "14px 8px", color: "#666" }}
+>
 {canSearch
 ? loading
 ? "Идёт поиск..."
