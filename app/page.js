@@ -40,7 +40,7 @@ let mounted = true;
 
 async function loadUserProfile() {
 const {
-data: { session }
+data: { session },
 } = await supabase.auth.getSession();
 
 if (!mounted) return;
@@ -83,7 +83,7 @@ setCustomerContact(session.user.email);
 loadUserProfile();
 
 const {
-data: { subscription }
+data: { subscription },
 } = supabase.auth.onAuthStateChange(async (_event, session) => {
 if (!mounted) return;
 
@@ -189,7 +189,7 @@ FORM_STORAGE_KEY,
 JSON.stringify({
 customerName,
 customerContact,
-customerComment
+customerComment,
 })
 );
 } catch (e) {
@@ -267,7 +267,7 @@ lastLoggedSearchRef.current = signature;
 
 try {
 const {
-data: { session }
+data: { session },
 } = await supabase.auth.getSession();
 
 await supabase.from("search_logs").insert({
@@ -275,7 +275,7 @@ user_id: session?.user?.id || null,
 email: session?.user?.email || null,
 query: (queryText || "").trim() || `[brand:${brandValue}]`,
 normalized_query: normalizedQuery || `[brand:${normalizedBrand}]`,
-results_count: Number(resultsCount) || 0
+results_count: Number(resultsCount) || 0,
 });
 } catch (e) {
 console.error("Failed to write search log", e);
@@ -318,7 +318,7 @@ try {
 const q = query.trim() || null;
 
 const { data, error } = await supabase.rpc("search_distinct_brands", {
-search_text: q
+search_text: q,
 });
 
 if (error) {
@@ -403,7 +403,7 @@ const foundCount = await runSearch(true);
 await logSearchAction({
 queryText: query,
 brandValue: brand,
-resultsCount: foundCount
+resultsCount: foundCount,
 });
 
 if (foundCount > 0) {
@@ -430,7 +430,7 @@ return () => clearTimeout(t);
 function scrollToTop() {
 window.scrollTo({
 top: 0,
-behavior: "smooth"
+behavior: "smooth",
 });
 }
 
@@ -438,25 +438,23 @@ function getRowKey(r) {
 return `${r.brand || ""}__${r.pn || ""}__${r.name || ""}`;
 }
 
-//function getDisplayPrice(r) {
-//if (typeof r.price_byn === "number") return `${r.price_byn.toFixed(2)} BYN`;
-//if (r.price_rub && String(r.price_rub).trim() !== "") return String(r.price_rub);
-//if (r.price_usd && String(r.price_usd).trim() !== "") return String(r.price_usd);
-//return "";
-//}
+function getDisplayPrice(r) {
+if (typeof r.price_byn === "number") {
+return `${r.price_byn.toLocaleString("ru-RU", {
+minimumFractionDigits: 2,
+maximumFractionDigits: 2,
+})} BYN`;
+}
 
-  function getDisplayPrice(r) {
-  if (typeof r.price_byn === "number") {
-    return `${r.price_byn.toLocaleString('ru-RU', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })} BYN`;
-  }
+if (r.price_rub && String(r.price_rub).trim() !== "") {
+return String(r.price_rub);
+}
 
-  if (r.price_rub && String(r.price_rub).trim() !== "") return String(r.price_rub);
-  if (r.price_usd && String(r.price_usd).trim() !== "") return String(r.price_usd);
+if (r.price_usd && String(r.price_usd).trim() !== "") {
+return String(r.price_usd);
+}
 
-  return "";
+return "";
 }
 
 function isInCart(r) {
@@ -488,8 +486,8 @@ price_byn: r.price_byn ?? null,
 displayPrice: getDisplayPrice(r),
 supplier: r.supplier || "",
 pricelist_name: r.pricelist_name || "",
-orderQty: 1
-}
+orderQty: 1,
+},
 ];
 });
 
@@ -529,7 +527,7 @@ return;
 }
 
 const {
-data: { session }
+data: { session },
 } = await supabase.auth.getSession();
 
 if (!session?.user) {
@@ -546,7 +544,7 @@ user_id: session.user.id,
 customer_name: customerName.trim(),
 customer_contact: customerContact.trim(),
 customer_comment: customerComment.trim(),
-status: "new"
+status: "new",
 })
 .select("id")
 .single();
@@ -566,7 +564,7 @@ name: item.name,
 order_qty: item.orderQty,
 stock_qty: item.stockQty,
 display_price: item.displayPrice,
-price_byn: typeof item.price_byn === "number" ? item.price_byn : null
+price_byn: typeof item.price_byn === "number" ? item.price_byn : null,
 }));
 
 const { error: itemsError } = await supabase
@@ -597,7 +595,7 @@ style={{
 width: "98vw",
 maxWidth: 2240,
 margin: "0 auto",
-padding: "20px 16px 120px"
+padding: "20px 16px 120px",
 }}
 >
 <p style={{ marginTop: 8, color: "#666", fontSize: 15 }}>
@@ -612,7 +610,7 @@ gap: 12,
 alignItems: "center",
 marginTop: 16,
 marginBottom: 18,
-flexWrap: "wrap"
+flexWrap: "wrap",
 }}
 >
 <input
@@ -635,7 +633,7 @@ maxWidth: "100%",
 padding: "10px 12px",
 border: "1px solid #ccc",
 borderRadius: 10,
-fontSize: 14
+fontSize: 14,
 }}
 />
 
@@ -648,7 +646,7 @@ style={{
 padding: "10px 12px",
 border: "1px solid #ccc",
 borderRadius: 10,
-fontSize: 14
+fontSize: 14,
 }}
 >
 <option value="ALL">Все бренды</option>
@@ -669,7 +667,7 @@ border: "1px solid #111",
 background: loading ? "#ddd" : "#111",
 color: loading ? "#333" : "#fff",
 cursor: loading ? "default" : "pointer",
-fontSize: 14
+fontSize: 14,
 }}
 >
 {loading ? "Ищу..." : "Поиск"}
@@ -678,6 +676,10 @@ fontSize: 14
 <div style={{ color: "#666", fontSize: 13 }}>
 {rows.length > 0 ? `Загружено: ${rows.length}` : " "}
 </div>
+
+{loadingBrands && (
+<div style={{ color: "#666", fontSize: 13 }}>Обновляю бренды...</div>
+)}
 </div>
 
 {errorText && (
@@ -687,7 +689,7 @@ marginTop: 14,
 padding: 12,
 border: "1px solid #f00",
 borderRadius: 10,
-color: "#900"
+color: "#900",
 }}
 >
 Ошибка: {errorText}
@@ -700,7 +702,7 @@ style={{
 width: "100%",
 borderCollapse: "collapse",
 fontSize: 13,
-tableLayout: "fixed"
+tableLayout: "fixed",
 }}
 >
 <colgroup>
@@ -724,7 +726,7 @@ tableLayout: "fixed"
 "Цена (BYN)",
 "Обновлён",
 ...(isAdmin ? ["Прайс"] : []),
-...(sessionUser ? ["Действие"] : [])
+...(sessionUser ? ["Действие"] : []),
 ].map((h) => (
 <th
 key={h}
@@ -733,7 +735,7 @@ textAlign: "left",
 padding: "10px 8px",
 borderBottom: "2px solid #ddd",
 whiteSpace: h === "Наименование" ? "normal" : "nowrap",
-verticalAlign: "top"
+verticalAlign: "top",
 }}
 >
 {h}
@@ -753,7 +755,7 @@ style={{
 padding: "8px",
 borderBottom: "1px solid #eee",
 whiteSpace: "nowrap",
-verticalAlign: "top"
+verticalAlign: "top",
 }}
 >
 {r.brand}
@@ -766,7 +768,7 @@ borderBottom: "1px solid #eee",
 whiteSpace: "normal",
 overflowWrap: "anywhere",
 wordBreak: "break-word",
-verticalAlign: "top"
+verticalAlign: "top",
 }}
 >
 {r.pn}
@@ -780,7 +782,7 @@ whiteSpace: "normal",
 overflowWrap: "anywhere",
 wordBreak: "break-word",
 lineHeight: 1.35,
-verticalAlign: "top"
+verticalAlign: "top",
 }}
 >
 {r.name}
@@ -792,7 +794,7 @@ padding: "8px",
 borderBottom: "1px solid #eee",
 whiteSpace: "nowrap",
 textAlign: "center",
-verticalAlign: "top"
+verticalAlign: "top",
 }}
 >
 {r.qty ?? ""}
@@ -803,16 +805,10 @@ style={{
 padding: "8px",
 borderBottom: "1px solid #eee",
 whiteSpace: "nowrap",
-verticalAlign: "top"
+verticalAlign: "top",
 }}
 >
-{typeof r.price_byn === "number"
-? r.price_byn.toFixed(2)
-: r.price_rub && String(r.price_rub).trim() !== ""
-? r.price_rub
-: r.price_usd && String(r.price_usd).trim() !== ""
-? r.price_usd
-: ""}
+{getDisplayPrice(r)}
 </td>
 
 <td
@@ -820,7 +816,7 @@ style={{
 padding: "8px",
 borderBottom: "1px solid #eee",
 whiteSpace: "nowrap",
-verticalAlign: "top"
+verticalAlign: "top",
 }}
 >
 {formatUpdateDate(r.last_upload_at)}
@@ -832,7 +828,7 @@ style={{
 padding: "8px",
 borderBottom: "1px solid #eee",
 whiteSpace: "normal",
-verticalAlign: "top"
+verticalAlign: "top",
 }}
 >
 {r.pricelist_name || "—"}
@@ -844,7 +840,7 @@ verticalAlign: "top"
 style={{
 padding: "8px",
 borderBottom: "1px solid #eee",
-verticalAlign: "top"
+verticalAlign: "top",
 }}
 >
 <button
@@ -857,7 +853,7 @@ background: added ? "#f3f3f3" : "#111",
 color: added ? "#111" : "#fff",
 cursor: "pointer",
 fontSize: 13,
-width: "100%"
+width: "100%",
 }}
 >
 {added ? "Добавлено" : "В заказ"}
@@ -886,6 +882,32 @@ style={{ padding: "14px 8px", color: "#666" }}
 </table>
 </div>
 
+{rows.length > 0 && hasMore && (
+<div
+style={{
+display: "flex",
+justifyContent: "center",
+marginTop: 20,
+}}
+>
+<button
+onClick={() => runSearch(false)}
+disabled={loadingMore}
+style={{
+padding: "12px 18px",
+borderRadius: 10,
+border: "1px solid #111",
+background: loadingMore ? "#ddd" : "#111",
+color: loadingMore ? "#333" : "#fff",
+cursor: loadingMore ? "default" : "pointer",
+fontSize: 14,
+}}
+>
+{loadingMore ? "Загружаю..." : "Загрузить еще"}
+</button>
+</div>
+)}
+
 {sessionUser && cart.length > 0 && (
 <button
 onClick={() => setOrderOpen((v) => !v)}
@@ -901,7 +923,7 @@ background: "#111",
 color: "#fff",
 cursor: "pointer",
 fontSize: 14,
-boxShadow: "0 8px 24px rgba(0,0,0,0.18)"
+boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
 }}
 >
 {orderOpen ? `Скрыть заявку (${cartCount})` : `Заявка (${cartCount})`}
@@ -923,7 +945,7 @@ background: "#111",
 color: "#fff",
 cursor: "pointer",
 fontSize: 14,
-boxShadow: "0 8px 24px rgba(0,0,0,0.18)"
+boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
 }}
 >
 В начало списка
@@ -945,7 +967,7 @@ background: "#fff",
 border: "1px solid #ddd",
 borderRadius: 16,
 boxShadow: "0 14px 34px rgba(0,0,0,0.18)",
-padding: 16
+padding: 16,
 }}
 >
 <div
@@ -954,7 +976,7 @@ display: "flex",
 justifyContent: "space-between",
 alignItems: "center",
 gap: 12,
-marginBottom: 12
+marginBottom: 12,
 }}
 >
 <h3 style={{ margin: 0, fontSize: 18 }}>Заявка</h3>
@@ -966,7 +988,7 @@ border: "none",
 background: "transparent",
 color: "#777",
 cursor: "pointer",
-fontSize: 13
+fontSize: 13,
 }}
 >
 Очистить
@@ -980,7 +1002,7 @@ key={item.key}
 style={{
 border: "1px solid #eee",
 borderRadius: 12,
-padding: 10
+padding: 10,
 }}
 >
 <div style={{ fontWeight: 700, marginBottom: 4 }}>
@@ -992,7 +1014,7 @@ style={{
 fontSize: 13,
 color: "#444",
 marginBottom: 8,
-lineHeight: 1.35
+lineHeight: 1.35,
 }}
 >
 {item.name}
@@ -1007,7 +1029,7 @@ style={{
 display: "flex",
 justifyContent: "space-between",
 alignItems: "center",
-gap: 10
+gap: 10,
 }}
 >
 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1019,7 +1041,7 @@ height: 28,
 borderRadius: 8,
 border: "1px solid #ccc",
 background: "#fff",
-cursor: "pointer"
+cursor: "pointer",
 }}
 >
 −
@@ -1037,7 +1059,7 @@ height: 28,
 borderRadius: 8,
 border: "1px solid #ccc",
 background: "#fff",
-cursor: "pointer"
+cursor: "pointer",
 }}
 >
 +
@@ -1051,7 +1073,7 @@ border: "none",
 background: "transparent",
 color: "#a00",
 cursor: "pointer",
-fontSize: 13
+fontSize: 13,
 }}
 >
 Удалить
@@ -1069,7 +1091,7 @@ border: "1px solid #e5e5e5",
 borderRadius: 10,
 background: "#fafafa",
 fontSize: 14,
-color: "#444"
+color: "#444",
 }}
 >
 Заявка будет отправлена от аккаунта{" "}
@@ -1088,7 +1110,7 @@ padding: "10px 12px",
 border: "1px solid #ccc",
 borderRadius: 10,
 fontSize: 14,
-resize: "vertical"
+resize: "vertical",
 }}
 />
 
@@ -1101,7 +1123,7 @@ border: "1px solid #111",
 background: "#111",
 color: "#fff",
 cursor: "pointer",
-fontSize: 14
+fontSize: 14,
 }}
 >
 Отправить заявку
