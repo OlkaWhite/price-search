@@ -218,7 +218,6 @@ unp: profileDraft.unp.trim() || null
 };
 
 const { error } = await supabase.from("profiles").upsert(payload);
-
 if (error) throw error;
 
 setCompanyName(profileDraft.companyName);
@@ -281,23 +280,6 @@ function cancelOrderEdit() {
 window.location.reload();
 }
 
-function changeItemQty(orderId, itemId, nextValue) {
-const qty = Math.max(1, Number(nextValue) || 1);
-
-setOrders((prev) =>
-prev.map((order) =>
-order.id !== orderId
-? order
-: {
-...order,
-order_items: (order.order_items || []).map((item) =>
-item.id !== itemId ? item : { ...item, order_qty: qty }
-)
-}
-)
-);
-}
-
 function changeOrderComment(orderId, nextValue) {
 setOrders((prev) =>
 prev.map((order) =>
@@ -319,19 +301,6 @@ order.id !== orderId
 : {
 ...order,
 order_items: (order.order_items || []).filter((item) => item.id !== itemId)
-}
-)
-);
-}
-
-function addOrderItem(orderId) {
-setOrders((prev) =>
-prev.map((order) =>
-order.id !== orderId
-? order
-: {
-...order,
-order_items: [...(order.order_items || []), createEmptyItem(order.id)]
 }
 )
 );
@@ -420,15 +389,7 @@ for (const item of existingItems) {
 const { error: updateError } = await supabase
 .from("order_items")
 .update({
-brand: item.brand || null,
-pn: item.pn || null,
-name: item.name || null,
 order_qty: Number(item.order_qty) || 1,
-price_byn: Number(item.price_byn) || 0,
-display_price:
-Number(item.price_byn) > 0
-? `${Number(item.price_byn).toFixed(2)} BYN`
-: "По запросу",
 requested_price_byn:
 item.requested_price_byn === null || item.requested_price_byn === ""
 ? null
@@ -762,7 +723,15 @@ boxSizing: "border-box"
 </div>
 )}
 
-<div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+<div
+style={{
+display: "flex",
+gap: 10,
+alignItems: "center",
+flexWrap: "wrap",
+justifyContent: "flex-end"
+}}
+>
 <StatusBadge status={order.status} />
 
 {hasInvoice ? (
@@ -870,7 +839,8 @@ alignItems: "start"
 <div style={cellStyle}>Шт: {item.order_qty || 0}</div>
 <div style={cellStyle}>Сумма: {itemTotal.toFixed(2)} BYN</div>
 <div style={cellStyle}>
-{item.requested_price_byn !== null && item.requested_price_byn !== undefined
+{item.requested_price_byn !== null &&
+item.requested_price_byn !== undefined
 ? `Цена клиента: ${Number(item.requested_price_byn).toFixed(2)} BYN`
 : "—"}
 </div>
@@ -884,33 +854,9 @@ gap: 12,
 alignItems: "start"
 }}
 >
-<input
-value={item.brand || ""}
-onChange={(e) =>
-updateOrderItemField(order.id, item.id, "brand", e.target.value)
-}
-style={cellInputStyle}
-placeholder="Бренд"
-/>
-
-<input
-value={item.pn || ""}
-onChange={(e) =>
-updateOrderItemField(order.id, item.id, "pn", e.target.value)
-}
-style={cellInputStyle}
-placeholder="P/N"
-/>
-
-<input
-value={item.name || ""}
-onChange={(e) =>
-updateOrderItemField(order.id, item.id, "name", e.target.value)
-}
-style={cellInputStyle}
-placeholder="Наименование"
-/>
-
+<div style={cellStyle}>{item.brand || "—"}</div>
+<div style={cellStyle}>{item.pn || "—"}</div>
+<div style={cellStyle}>{item.name || "—"}</div>
 <div style={cellStyle}>{unitPrice}</div>
 
 <div style={cellStyle}>
@@ -919,7 +865,12 @@ type="number"
 min="1"
 value={item.order_qty}
 onChange={(e) =>
-updateOrderItemField(order.id, item.id, "order_qty", e.target.value)
+updateOrderItemField(
+order.id,
+item.id,
+"order_qty",
+e.target.value
+)
 }
 style={cellInputStyle}
 />
@@ -930,7 +881,9 @@ style={cellInputStyle}
 onClick={() => toggleRequestPrice(order.id, item.id)}
 style={secondaryButtonStyle}
 >
-Запросить цену
+{item.requested_price_byn !== null
+? "Цена запрошена"
+: "Запросить цену"}
 </button>
 
 {(item.request_price_mode || item.requested_price_byn !== null) && (
