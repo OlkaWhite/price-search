@@ -443,7 +443,7 @@ if (typeof r.price_byn === "number") {
 return `${r.price_byn.toLocaleString("ru-RU", {
 minimumFractionDigits: 2,
 maximumFractionDigits: 2,
-})} BYN`;
+})} `;
 }
 
 if (r.price_rub && String(r.price_rub).trim() !== "") {
