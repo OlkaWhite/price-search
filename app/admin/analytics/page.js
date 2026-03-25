@@ -20,11 +20,9 @@ const { data: logsData, error: logsError } = await supabase
 .select(`
 id,
 user_id,
-user_email,
-anon_session_id,
-query_text,
-brand_filter,
-price_sort,
+email,
+query,
+normalized_query,
 results_count,
 created_at
 `)
@@ -78,11 +76,11 @@ const profile = log.user_id ? profilesMap[log.user_id] || null : null;
 
 const userKey = log.user_id
 ? `user:${log.user_id}`
-: `anon:${log.anon_session_id || log.id}`;
+: `guest:${log.email || log.id}`;
 
 const userLabel = profile?.company_name
 ? `${profile.company_name}${profile.contact_name ? ` — ${profile.contact_name}` : ""}`
-: profile?.email || log.user_email || log.anon_session_id || "Аноним";
+: profile?.email || log.email || "Гость";
 
 return {
 ...log,
@@ -113,7 +111,7 @@ const topQueries = useMemo(() => {
 const map = new Map();
 
 enrichedLogs.forEach((item) => {
-const q = (item.query_text || "").trim();
+const q = (item.normalized_query || item.query || "").trim();
 if (!q) return;
 
 const current = map.get(q) || { query: q, count: 0, noResults: 0 };
@@ -131,7 +129,7 @@ const noResultQueries = useMemo(() => {
 const map = new Map();
 
 enrichedLogs.forEach((item) => {
-const q = (item.query_text || "").trim();
+const q = (item.normalized_query || item.query || "").trim();
 if (!q || Number(item.results_count) !== 0) return;
 
 const current = map.get(q) || { query: q, count: 0 };
@@ -181,7 +179,7 @@ const subset = enrichedLogs.filter((x) => x.userKey === selectedUserKey);
 const map = new Map();
 
 subset.forEach((item) => {
-const q = (item.query_text || "").trim();
+const q = (item.normalized_query || item.query || "").trim();
 if (!q) return;
 
 const current = map.get(q) || {
@@ -347,16 +345,14 @@ columns={[
 "Дата",
 "Пользователь",
 "Запрос",
-"Бренд",
-"Сортировка",
+"Нормализованный",
 "Результатов"
 ]}
 rows={enrichedLogs.slice(0, 50).map((item) => [
 new Date(item.created_at).toLocaleString(),
 item.userLabel,
-item.query_text || "—",
-item.brand_filter || "—",
-item.price_sort || "—",
+item.query || "—",
+item.normalized_query || "—",
 item.results_count
 ])}
 emptyText="Логов пока нет"
