@@ -368,20 +368,21 @@ zIndex: 2000,
 display: "flex",
 justifyContent: "center",
 alignItems: "flex-start",
-padding: "32px 20px",
+padding: "24px 16px",
 overflowY: "auto"
 }}
 >
 <div
 onClick={(e) => e.stopPropagation()}
 style={{
-width: "100%",
-maxWidth: 1400,
+width: "96vw",
+maxWidth: 1900,
 background: "#fff",
 borderRadius: 18,
 border: "1px solid #e5e5e5",
 boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
-padding: 24
+padding: 24,
+boxSizing: "border-box"
 }}
 >
 <div
@@ -407,7 +408,7 @@ style={smallGhostButtonStyle}
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "minmax(320px, 430px) minmax(0, 1fr)",
+gridTemplateColumns: "minmax(340px, 460px) minmax(700px, 1fr)",
 gap: 24,
 alignItems: "start"
 }}
@@ -537,7 +538,9 @@ style={{
 border: "1px solid #eee",
 borderRadius: 14,
 padding: 16,
-background: "#fff"
+background: "#fff",
+minWidth: 0,
+overflowX: "auto"
 }}
 >
 <h3 style={{ marginTop: 0, marginBottom: 14 }}>Позиции заказа</h3>
@@ -545,6 +548,31 @@ background: "#fff"
 {(selectedOrder.order_items || []).length === 0 ? (
 <div style={{ color: "#666" }}>Позиции в заказе не найдены.</div>
 ) : (
+<>
+<div
+style={{
+display: "grid",
+gridTemplateColumns: "110px 160px minmax(260px, 1fr) 90px 110px 130px",
+gap: 12,
+alignItems: "center",
+padding: "0 12px 10px",
+borderBottom: "1px solid #eee",
+marginBottom: 10,
+color: "#666",
+fontSize: 12,
+fontWeight: 700,
+textTransform: "uppercase",
+letterSpacing: "0.02em"
+}}
+>
+<div>Бренд</div>
+<div>P/N</div>
+<div>Наименование</div>
+<div>Шт</div>
+<div>Цена</div>
+<div>Сумма</div>
+</div>
+
 <div style={{ display: "grid", gap: 10 }}>
 {(selectedOrder.order_items || []).map((item) => (
 <div
@@ -559,7 +587,7 @@ background: "#fafafa"
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "120px 180px minmax(280px, 1fr) 100px 120px 140px",
+gridTemplateColumns: "110px 160px minmax(260px, 1fr) 90px 110px 130px",
 gap: 12,
 alignItems: "start"
 }}
@@ -580,6 +608,7 @@ alignItems: "start"
 </div>
 ))}
 </div>
+</>
 )}
 </div>
 </div>
