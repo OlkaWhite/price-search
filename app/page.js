@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 const PAGE_SIZE = 100;
@@ -31,6 +31,8 @@ const [customerContact, setCustomerContact] = useState("");
 const [customerComment, setCustomerComment] = useState("");
 
 const [sessionUser, setSessionUser] = useState(null);
+
+const lastLoggedSearchRef = useRef("");
 
 useEffect(() => {
 let mounted = true;
@@ -245,6 +247,34 @@ const month = String(d.getMonth() + 1).padStart(2, "0");
 return `${day}.${month}`;
 }
 
+async function logSearchAction({ queryText, brandValue, resultsCount }) {
+const normalizedQuery = (queryText || "").trim().toLowerCase();
+const normalizedBrand =
+brandValue === "ALL" ? "" : (brandValue || "").trim().toLowerCase();
+const signature = `${normalizedQuery}__${normalizedBrand}__${resultsCount}`;
+
+if (!normalizedQuery && !normalizedBrand) return;
+if (lastLoggedSearchRef.current === signature) return;
+
+lastLoggedSearchRef.current = signature;
+
+try {
+const {
+data: { session }
+} = await supabase.auth.getSession();
+
+await supabase.from("search_logs").insert({
+user_id: session?.user?.id || null,
+email: session?.user?.email || null,
+query: (queryText || "").trim() || `[brand:${brandValue}]`,
+normalized_query: normalizedQuery || `[brand:${normalizedBrand}]`,
+results_count: Number(resultsCount) || 0
+});
+} catch (e) {
+console.error("Failed to write search log", e);
+}
+}
+
 function buildRowsQuery() {
 const q = query.trim();
 
@@ -362,6 +392,12 @@ setPage(0);
 setHasMore(false);
 
 const foundCount = await runSearch(true);
+
+await logSearchAction({
+queryText: query,
+brandValue: brand,
+resultsCount: foundCount
+});
 
 if (foundCount > 0) {
 loadSearchBrands();
