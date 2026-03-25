@@ -27,10 +27,27 @@ isNew: true
 };
 }
 
+function normalizeOrders(ordersData) {
+return (ordersData || []).map((order) => ({
+...order,
+order_items: (order.order_items || []).map((item) => ({
+...item,
+order_qty: Number(item.order_qty) || 1,
+price_byn: Number(item.price_byn) || 0,
+requested_price_byn:
+item.requested_price_byn === null || item.requested_price_byn === undefined
+? null
+: Number(item.requested_price_byn) || 0,
+request_price_mode: false
+}))
+}));
+}
+
 export default function AccountPage() {
 const [sessionUser, setSessionUser] = useState(null);
 const [profile, setProfile] = useState(null);
 const [orders, setOrders] = useState([]);
+const [originalOrders, setOriginalOrders] = useState([]);
 
 const [loading, setLoading] = useState(true);
 const [savingProfile, setSavingProfile] = useState(false);
@@ -78,15 +95,14 @@ return;
 
 setSessionUser(session.user);
 
-const { data: profileData, error: profileError } = await supabase
+const [profileRes, ordersRes] = await Promise.all([
+supabase
 .from("profiles")
 .select("id, email, company_name, contact_name, phone, telegram, unp, role")
 .eq("id", session.user.id)
-.maybeSingle();
+.maybeSingle(),
 
-if (profileError) throw profileError;
-
-const { data: ordersData, error: ordersError } = await supabase
+supabase
 .from("orders")
 .select(`
 id,
@@ -111,28 +127,22 @@ requested_price_byn
 )
 `)
 .eq("user_id", session.user.id)
-.order("created_at", { ascending: false });
-
-if (ordersError) throw ordersError;
+.order("created_at", { ascending: false })
+]);
 
 if (!mounted) return;
 
-const normalizedOrders = (ordersData || []).map((order) => ({
-...order,
-order_items: (order.order_items || []).map((item) => ({
-...item,
-order_qty: Number(item.order_qty) || 1,
-price_byn: Number(item.price_byn) || 0,
-requested_price_byn:
-item.requested_price_byn === null || item.requested_price_byn === undefined
-? null
-: Number(item.requested_price_byn) || 0,
-request_price_mode: false
-}))
-}));
+const { data: profileData, error: profileError } = profileRes;
+const { data: ordersData, error: ordersError } = ordersRes;
+
+if (profileError) throw profileError;
+if (ordersError) throw ordersError;
+
+const normalizedOrders = normalizeOrders(ordersData || []);
 
 setProfile(profileData || null);
 setOrders(normalizedOrders);
+setOriginalOrders(normalizedOrders);
 
 const nextCompany = profileData?.company_name || "";
 const nextContact = profileData?.contact_name || "";
@@ -277,7 +287,17 @@ setEditingOrderId(orderId);
 }
 
 function cancelOrderEdit() {
-window.location.reload();
+if (!editingOrderId) return;
+
+setOrders((prev) =>
+prev.map((order) => {
+if (order.id !== editingOrderId) return order;
+const originalOrder = originalOrders.find((x) => x.id === editingOrderId);
+return originalOrder ? { ...originalOrder } : order;
+})
+);
+
+setEditingOrderId(null);
 }
 
 function changeOrderComment(orderId, nextValue) {
@@ -436,6 +456,21 @@ const { error: deleteError } = await supabase
 if (deleteError) throw deleteError;
 }
 
+const refreshedOrders = orders.map((currentOrder) =>
+currentOrder.id === order.id
+? {
+...currentOrder,
+customer_comment: order.customer_comment || null,
+order_items: currentItems.map((item) => ({
+...item,
+request_price_mode: false
+}))
+}
+: currentOrder
+);
+
+setOrders(refreshedOrders);
+setOriginalOrders(refreshedOrders);
 setEditingOrderId(null);
 setMessage(`Заявка #${order.id} сохранена.`);
 } catch (err) {
@@ -459,12 +494,12 @@ const { error } = await supabase
 
 if (error) throw error;
 
-setOrders((prev) =>
-prev.map((order) =>
+const nextOrders = orders.map((order) =>
 order.id === orderId ? { ...order, invoice_requested: true } : order
-)
 );
 
+setOrders(nextOrders);
+setOriginalOrders(nextOrders);
 setMessage(`Запрос на счёт по заявке #${orderId} отправлен.`);
 } catch (err) {
 console.error("Invoice request error:", err);
@@ -477,7 +512,13 @@ setRequestingInvoiceId(null);
 if (loading) {
 return (
 <div style={pageWrapStyle}>
-<div style={pageInnerStyle}>Загружаю личный кабинет...</div>
+<div style={pageInnerStyle}>
+<div style={{ display: "grid", gap: 16 }}>
+<div style={skeletonCardStyle} />
+<div style={skeletonCardStyle} />
+<div style={{ ...skeletonCardStyle, height: 220 }} />
+</div>
+</div>
 </div>
 );
 }
@@ -654,7 +695,7 @@ style={secondaryButtonStyle}
 <InfoRow label="Всего заявок" value={orders.length} />
 <InfoRow
 label="Общая сумма заявок"
-value={`${orders.reduce((sum, order) => sum + calcOrderTotal(order), 0).toFixed(2)} BYN`}
+value={`${ordersStats.totalAmount.toFixed(2)} BYN`}
 />
 </div>
 </div>
@@ -1101,6 +1142,13 @@ borderRadius: 16,
 background: "#fff",
 padding: 20,
 minWidth: 0
+};
+
+const skeletonCardStyle = {
+height: 120,
+borderRadius: 16,
+background: "#f3f3f3",
+border: "1px solid #ececec"
 };
 
 const inputStyle = {
