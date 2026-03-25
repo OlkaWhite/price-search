@@ -13,6 +13,26 @@ processed: "Обработана",
 canceled: "Отменена"
 };
 
+function createEmptyItem(orderId) {
+return {
+id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+order_id: orderId,
+brand: "",
+pn: "",
+name: "",
+order_qty: 1,
+stock_qty: null,
+display_price: "",
+price_byn: 0,
+isNew: true
+};
+}
+
+function formatPriceDisplay(price) {
+const value = Number(price) || 0;
+return `${value.toFixed(2)} BYN`;
+}
+
 export default function AdminOrdersPage() {
 const [orders, setOrders] = useState([]);
 const [statusFilter, setStatusFilter] = useState("all");
@@ -59,10 +79,7 @@ req = req.eq("status", statusFilter);
 }
 
 const { data: ordersData, error: ordersError } = await req;
-
-if (ordersError) {
-throw ordersError;
-}
+if (ordersError) throw ordersError;
 
 const userIds = Array.from(
 new Set((ordersData || []).map((o) => o.user_id).filter(Boolean))
@@ -76,9 +93,7 @@ const { data: profilesData, error: profilesError } = await supabase
 .select("id, email, company_name, contact_name, phone, telegram, unp")
 .in("id", userIds);
 
-if (profilesError) {
-throw profilesError;
-}
+if (profilesError) throw profilesError;
 
 profilesMap = Object.fromEntries(
 (profilesData || []).map((p) => [p.id, p])
@@ -87,7 +102,12 @@ profilesMap = Object.fromEntries(
 
 const enrichedOrders = (ordersData || []).map((order) => ({
 ...order,
-order_items: order.order_items || [],
+order_items: (order.order_items || []).map((item) => ({
+...item,
+order_qty: Number(item.order_qty) || 1,
+price_byn: Number(item.price_byn) || 0,
+display_price: item.display_price || formatPriceDisplay(item.price_byn)
+})),
 profile: profilesMap[order.user_id] || null
 }));
 
@@ -129,11 +149,66 @@ totalAmount
 };
 }, [orders]);
 
+function openOrder(order) {
+setSelectedOrder({
+...order,
+order_items: (order.order_items || []).map((item) => ({
+...item,
+order_qty: Number(item.order_qty) || 1,
+price_byn: Number(item.price_byn) || 0,
+display_price: item.display_price || formatPriceDisplay(item.price_byn)
+}))
+});
+}
+
+function updateSelectedOrderField(field, value) {
+setSelectedOrder((prev) => ({ ...prev, [field]: value }));
+}
+
+function updateOrderItem(itemId, field, value) {
+setSelectedOrder((prev) => ({
+...prev,
+order_items: (prev.order_items || []).map((item) => {
+if (item.id !== itemId) return item;
+
+if (field === "order_qty") {
+return { ...item, order_qty: Math.max(1, Number(value) || 1) };
+}
+
+if (field === "price_byn") {
+const nextPrice = Number(value) || 0;
+return {
+...item,
+price_byn: nextPrice,
+display_price: formatPriceDisplay(nextPrice)
+};
+}
+
+return { ...item, [field]: value };
+})
+}));
+}
+
+function removeOrderItem(itemId) {
+setSelectedOrder((prev) => ({
+...prev,
+order_items: (prev.order_items || []).filter((item) => item.id !== itemId)
+}));
+}
+
+function addOrderItem() {
+setSelectedOrder((prev) => ({
+...prev,
+order_items: [...(prev.order_items || []), createEmptyItem(prev.id)]
+}));
+}
+
 async function saveOrderUpdates() {
 if (!selectedOrder) return;
 
 setSaving(true);
 
+try {
 const payload = {
 status: selectedOrder.status,
 manager_comment: selectedOrder.manager_comment || "",
@@ -142,19 +217,86 @@ processed_at:
 selectedOrder.status === "processed" ? new Date().toISOString() : null
 };
 
-const { error } = await supabase
+const { error: orderError } = await supabase
 .from("orders")
 .update(payload)
 .eq("id", selectedOrder.id);
 
-if (error) {
-alert("Ошибка при сохранении: " + error.message);
-} else {
-await loadOrders();
-alert("Заказ обновлён.");
+if (orderError) throw orderError;
+
+const existingItems = (selectedOrder.order_items || []).filter((item) => !item.isNew);
+const newItems = (selectedOrder.order_items || []).filter((item) => item.isNew);
+
+const { data: dbItems, error: dbReadError } = await supabase
+.from("order_items")
+.select("id")
+.eq("order_id", selectedOrder.id);
+
+if (dbReadError) throw dbReadError;
+
+const dbIds = (dbItems || []).map((x) => x.id);
+const currentExistingIds = existingItems.map((x) => x.id);
+const idsToDelete = dbIds.filter((id) => !currentExistingIds.includes(id));
+
+for (const item of existingItems) {
+const normalizedPrice = Number(item.price_byn) || 0;
+const normalizedQty = Math.max(1, Number(item.order_qty) || 1);
+
+const { error } = await supabase
+.from("order_items")
+.update({
+brand: item.brand || null,
+pn: item.pn || null,
+name: item.name || null,
+order_qty: normalizedQty,
+price_byn: normalizedPrice,
+display_price: formatPriceDisplay(normalizedPrice)
+})
+.eq("id", item.id)
+.eq("order_id", selectedOrder.id);
+
+if (error) throw error;
 }
 
+if (newItems.length > 0) {
+const insertPayload = newItems.map((item) => {
+const normalizedPrice = Number(item.price_byn) || 0;
+const normalizedQty = Math.max(1, Number(item.order_qty) || 1);
+
+return {
+order_id: selectedOrder.id,
+brand: item.brand || null,
+pn: item.pn || null,
+name: item.name || null,
+order_qty: normalizedQty,
+stock_qty: item.stock_qty || null,
+price_byn: normalizedPrice,
+display_price: formatPriceDisplay(normalizedPrice)
+};
+});
+
+const { error } = await supabase.from("order_items").insert(insertPayload);
+if (error) throw error;
+}
+
+if (idsToDelete.length > 0) {
+const { error } = await supabase
+.from("order_items")
+.delete()
+.in("id", idsToDelete);
+
+if (error) throw error;
+}
+
+await loadOrders();
+setSelectedOrder(null);
+alert("Заказ обновлён.");
+} catch (error) {
+console.error("saveOrderUpdates error:", error);
+alert("Ошибка при сохранении: " + (error?.message || "неизвестная ошибка"));
+} finally {
 setSaving(false);
+}
 }
 
 return (
@@ -196,15 +338,7 @@ fontSize: 14
 
 <button
 onClick={loadOrders}
-style={{
-padding: "10px 14px",
-borderRadius: 10,
-border: "1px solid #111",
-background: "#111",
-color: "#fff",
-cursor: "pointer",
-fontSize: 14
-}}
+style={mainButtonStyle}
 >
 Обновить
 </button>
@@ -278,13 +412,7 @@ fontSize: 14
 ].map((h) => (
 <th
 key={h}
-style={{
-textAlign: "left",
-padding: "12px 10px",
-borderBottom: "1px solid #eee",
-background: "#fafafa",
-whiteSpace: "nowrap"
-}}
+style={thStyle}
 >
 {h}
 </th>
@@ -299,6 +427,7 @@ const itemsCount = (order.order_items || []).reduce(
 );
 
 const invoiceSet = !!order.invoice_url;
+const requestIsGreen = !!order.invoice_requested && invoiceSet;
 
 return (
 <tr key={order.id}>
@@ -325,7 +454,7 @@ return (
 value={order.invoice_requested}
 trueLabel="Да"
 falseLabel="Нет"
-trueTone="danger"
+trueTone={requestIsGreen ? "success" : "danger"}
 falseTone="neutral"
 />
 </td>
@@ -342,7 +471,7 @@ falseTone="danger"
 <td style={tdStyle}>{calcOrderTotal(order).toFixed(2)} BYN</td>
 <td style={tdStyle}>
 <button
-onClick={() => setSelectedOrder(order)}
+onClick={() => openOrder(order)}
 style={smallButtonStyle}
 >
 Открыть
@@ -408,7 +537,7 @@ style={smallGhostButtonStyle}
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "minmax(340px, 460px) minmax(700px, 1fr)",
+gridTemplateColumns: "minmax(320px, 390px) minmax(0, 1fr)",
 gap: 24,
 alignItems: "start"
 }}
@@ -421,45 +550,53 @@ padding: 16,
 background: "#fafafa"
 }}
 >
-<div style={{ display: "grid", gap: 12 }}>
-<InfoRow label="Дата" value={new Date(selectedOrder.created_at).toLocaleString()} />
-<InfoRow label="Клиент" value={selectedOrder.customer_name || "—"} />
-<InfoRow label="Контакт" value={selectedOrder.customer_contact || "—"} />
-<InfoRow label="Комментарий клиента" value={selectedOrder.customer_comment || "—"} />
-<InfoRow label="Email" value={selectedOrder.profile?.email || "—"} />
-<InfoRow label="Компания" value={selectedOrder.profile?.company_name || "—"} />
-<InfoRow label="Контактное лицо" value={selectedOrder.profile?.contact_name || "—"} />
-<InfoRow label="Телефон" value={selectedOrder.profile?.phone || "—"} />
-<InfoRow label="Telegram" value={selectedOrder.profile?.telegram || "—"} />
-<InfoRow label="УНП" value={selectedOrder.profile?.unp || "—"} />
-<InfoRow
-label="Запрос счёта"
-value={selectedOrder.invoice_requested ? "Да" : "Нет"}
+<div style={{ display: "grid", gap: 10 }}>
+<CompactInfo label="Дата" value={new Date(selectedOrder.created_at).toLocaleString()} />
+<CompactInfo label="Контактное лицо" value={selectedOrder.profile?.contact_name || selectedOrder.customer_name || "—"} />
+<CompactInfo label="Компания" value={selectedOrder.profile?.company_name || "—"} />
+<CompactInfo label="УНП" value={selectedOrder.profile?.unp || "—"} />
+<CompactInfo label="Телефон" value={selectedOrder.profile?.phone || selectedOrder.customer_contact || "—"} />
+<CompactInfo label="Telegram" value={selectedOrder.profile?.telegram || "—"} />
+<CompactInfo label="E-mail" value={selectedOrder.profile?.email || "—"} />
+<CompactInfo label="Сумма заказа" value={`${calcOrderTotal(selectedOrder).toFixed(2)} BYN`} />
+<div>
+<div style={compactLabelStyle}>Статус</div>
+<div style={{ marginTop: 4 }}>
+<StatusBadge status={selectedOrder.status} />
+</div>
+</div>
+<div>
+<div style={compactLabelStyle}>Счёт запрошен</div>
+<div style={{ marginTop: 4 }}>
+<BoolBadge
+value={selectedOrder.invoice_requested}
+trueLabel="Да"
+falseLabel="Нет"
+trueTone={selectedOrder.invoice_requested && selectedOrder.invoice_url ? "success" : "danger"}
+falseTone="neutral"
 />
-<InfoRow
-label="Счёт выставлен"
-value={selectedOrder.invoice_url ? "Да" : "Нет"}
+</div>
+</div>
+<div>
+<div style={compactLabelStyle}>Счёт выставлен</div>
+<div style={{ marginTop: 4 }}>
+<BoolBadge
+value={!!selectedOrder.invoice_url}
+trueLabel="Да"
+falseLabel="Нет"
+trueTone="success"
+falseTone="danger"
 />
-<InfoRow
-label="Сумма заказа"
-value={`${calcOrderTotal(selectedOrder).toFixed(2)} BYN`}
-/>
+</div>
+</div>
 </div>
 
 <div style={{ marginTop: 18 }}>
-<div style={{ fontWeight: 700, marginBottom: 8 }}>Статус</div>
+<div style={sectionTitleStyle}>Статус заказа</div>
 <select
 value={selectedOrder.status}
-onChange={(e) =>
-setSelectedOrder((prev) => ({ ...prev, status: e.target.value }))
-}
-style={{
-width: "100%",
-padding: "10px 12px",
-border: "1px solid #ccc",
-borderRadius: 10,
-fontSize: 14
-}}
+onChange={(e) => updateSelectedOrderField("status", e.target.value)}
+style={fullControlStyle}
 >
 {STATUS_OPTIONS.filter((s) => s !== "all").map((status) => (
 <option key={status} value={status}>
@@ -470,47 +607,25 @@ fontSize: 14
 </div>
 
 <div style={{ marginTop: 18 }}>
-<div style={{ fontWeight: 700, marginBottom: 8 }}>Комментарий менеджера</div>
+<div style={sectionTitleStyle}>Комментарий менеджера</div>
 <textarea
 value={selectedOrder.manager_comment || ""}
-onChange={(e) =>
-setSelectedOrder((prev) => ({
-...prev,
-manager_comment: e.target.value
-}))
-}
+onChange={(e) => updateSelectedOrderField("manager_comment", e.target.value)}
 rows={4}
 style={{
-width: "100%",
-padding: "10px 12px",
-border: "1px solid #ccc",
-borderRadius: 10,
-fontSize: 14,
-resize: "vertical",
-boxSizing: "border-box"
+...fullControlStyle,
+resize: "vertical"
 }}
 />
 </div>
 
 <div style={{ marginTop: 18 }}>
-<div style={{ fontWeight: 700, marginBottom: 8 }}>Ссылка на счёт</div>
+<div style={sectionTitleStyle}>Ссылка на счёт</div>
 <input
 value={selectedOrder.invoice_url || ""}
-onChange={(e) =>
-setSelectedOrder((prev) => ({
-...prev,
-invoice_url: e.target.value
-}))
-}
+onChange={(e) => updateSelectedOrderField("invoice_url", e.target.value)}
 placeholder="https://..."
-style={{
-width: "100%",
-padding: "10px 12px",
-border: "1px solid #ccc",
-borderRadius: 10,
-fontSize: 14,
-boxSizing: "border-box"
-}}
+style={fullControlStyle}
 />
 </div>
 
@@ -519,13 +634,10 @@ boxSizing: "border-box"
 onClick={saveOrderUpdates}
 disabled={saving}
 style={{
-padding: "12px 14px",
-borderRadius: 10,
-border: "1px solid #111",
+...mainButtonStyle,
 background: saving ? "#ddd" : "#111",
 color: saving ? "#333" : "#fff",
-cursor: saving ? "default" : "pointer",
-fontSize: 14
+cursor: saving ? "default" : "pointer"
 }}
 >
 {saving ? "Сохраняю..." : "Сохранить изменения"}
@@ -543,16 +655,30 @@ minWidth: 0,
 overflowX: "auto"
 }}
 >
-<h3 style={{ marginTop: 0, marginBottom: 14 }}>Позиции заказа</h3>
+<div
+style={{
+display: "flex",
+justifyContent: "space-between",
+gap: 12,
+alignItems: "center",
+marginBottom: 14,
+flexWrap: "wrap"
+}}
+>
+<h3 style={{ margin: 0 }}>Позиции заказа</h3>
 
-{(selectedOrder.order_items || []).length === 0 ? (
-<div style={{ color: "#666" }}>Позиции в заказе не найдены.</div>
-) : (
-<>
+<button
+onClick={addOrderItem}
+style={smallButtonStyle}
+>
+Добавить позицию
+</button>
+</div>
+
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "110px 160px minmax(260px, 1fr) 90px 110px 130px",
+gridTemplateColumns: "120px 170px minmax(260px, 1fr) 90px 120px 130px 130px",
 gap: 12,
 alignItems: "center",
 padding: "0 12px 10px",
@@ -571,8 +697,12 @@ letterSpacing: "0.02em"
 <div>Шт</div>
 <div>Цена</div>
 <div>Сумма</div>
+<div></div>
 </div>
 
+{(selectedOrder.order_items || []).length === 0 ? (
+<div style={{ color: "#666" }}>Позиции в заказе не найдены.</div>
+) : (
 <div style={{ display: "grid", gap: 10 }}>
 {(selectedOrder.order_items || []).map((item) => (
 <div
@@ -587,28 +717,72 @@ background: "#fafafa"
 <div
 style={{
 display: "grid",
-gridTemplateColumns: "110px 160px minmax(260px, 1fr) 90px 110px 130px",
+gridTemplateColumns: "120px 170px minmax(260px, 1fr) 90px 120px 130px 130px",
 gap: 12,
 alignItems: "start"
 }}
 >
-<div style={itemCellStyle}>{item.brand || "—"}</div>
-<div style={itemCellStyle}>{item.pn || "—"}</div>
-<div style={itemCellStyle}>{item.name || "—"}</div>
-<div style={itemCellStyle}>Шт: {item.order_qty || 0}</div>
-<div style={itemCellStyle}>
-{typeof item.price_byn === "number"
-? `${item.price_byn.toFixed(2)} BYN`
-: item.display_price || "—"}
-</div>
+<input
+value={item.brand || ""}
+onChange={(e) => updateOrderItem(item.id, "brand", e.target.value)}
+style={cellInputStyle}
+placeholder="Бренд"
+/>
+
+<input
+value={item.pn || ""}
+onChange={(e) => updateOrderItem(item.id, "pn", e.target.value)}
+style={cellInputStyle}
+placeholder="P/N"
+/>
+
+<input
+value={item.name || ""}
+onChange={(e) => updateOrderItem(item.id, "name", e.target.value)}
+style={cellInputStyle}
+placeholder="Наименование"
+/>
+
+<input
+type="number"
+min="1"
+value={item.order_qty}
+onChange={(e) => updateOrderItem(item.id, "order_qty", e.target.value)}
+style={cellInputStyle}
+/>
+
+<input
+type="number"
+min="0"
+step="0.01"
+value={item.price_byn}
+onChange={(e) => updateOrderItem(item.id, "price_byn", e.target.value)}
+style={cellInputStyle}
+/>
+
 <div style={itemCellStyle}>
 {calcItemTotal(item).toFixed(2)} BYN
 </div>
+
+<button
+onClick={() => removeOrderItem(item.id)}
+style={{
+padding: "8px 10px",
+borderRadius: 10,
+border: "1px solid #e3b7b7",
+background: "#fff",
+color: "#a22",
+cursor: "pointer",
+fontSize: 13,
+width: "100%"
+}}
+>
+Удалить
+</button>
 </div>
 </div>
 ))}
 </div>
-</>
 )}
 </div>
 </div>
@@ -620,23 +794,13 @@ alignItems: "start"
 }
 
 function calcItemTotal(item) {
-const price =
-typeof item.price_byn === "number"
-? item.price_byn
-: Number(item.price_byn) || 0;
-
-const qty =
-typeof item.order_qty === "number"
-? item.order_qty
-: Number(item.order_qty) || 0;
-
+const price = Number(item.price_byn) || 0;
+const qty = Number(item.order_qty) || 0;
 return price * qty;
 }
 
 function calcOrderTotal(order) {
-return (order.order_items || []).reduce((sum, item) => {
-return sum + calcItemTotal(item);
-}, 0);
+return (order.order_items || []).reduce((sum, item) => sum + calcItemTotal(item), 0);
 }
 
 function StatusBadge({ status }) {
@@ -699,13 +863,18 @@ whiteSpace: "nowrap"
 );
 }
 
-function InfoRow({ label, value }) {
+function CompactInfo({ label, value }) {
 return (
-<div>
-<div style={{ fontSize: 12, color: "#666", marginBottom: 2 }}>{label}</div>
-<div style={{ fontSize: 14, overflowWrap: "anywhere", wordBreak: "break-word" }}>
-{value}
-</div>
+<div
+style={{
+display: "grid",
+gridTemplateColumns: "130px minmax(0, 1fr)",
+gap: 10,
+alignItems: "start"
+}}
+>
+<div style={compactLabelStyle}>{label}</div>
+<div style={compactValueStyle}>{value}</div>
 </div>
 );
 }
@@ -726,10 +895,28 @@ background: "#fff"
 );
 }
 
+const thStyle = {
+textAlign: "left",
+padding: "12px 10px",
+borderBottom: "1px solid #eee",
+background: "#fafafa",
+whiteSpace: "nowrap"
+};
+
 const tdStyle = {
 padding: "12px 10px",
 borderBottom: "1px solid #eee",
 verticalAlign: "top"
+};
+
+const mainButtonStyle = {
+padding: "10px 14px",
+borderRadius: 10,
+border: "1px solid #111",
+background: "#111",
+color: "#fff",
+cursor: "pointer",
+fontSize: 14
 };
 
 const smallButtonStyle = {
@@ -752,9 +939,45 @@ cursor: "pointer",
 fontSize: 13
 };
 
+const compactLabelStyle = {
+fontSize: 12,
+color: "#666",
+fontWeight: 600
+};
+
+const compactValueStyle = {
+fontSize: 14,
+overflowWrap: "anywhere",
+wordBreak: "break-word"
+};
+
+const sectionTitleStyle = {
+fontWeight: 700,
+marginBottom: 8
+};
+
+const fullControlStyle = {
+width: "100%",
+padding: "10px 12px",
+border: "1px solid #ccc",
+borderRadius: 10,
+fontSize: 14,
+boxSizing: "border-box"
+};
+
+const cellInputStyle = {
+width: "100%",
+padding: "8px 10px",
+border: "1px solid #ccc",
+borderRadius: 10,
+fontSize: 14,
+boxSizing: "border-box"
+};
+
 const itemCellStyle = {
 fontSize: 14,
 lineHeight: 1.4,
 overflowWrap: "anywhere",
-wordBreak: "break-word"
+wordBreak: "break-word",
+paddingTop: 8
 };
