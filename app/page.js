@@ -7,6 +7,10 @@ const PAGE_SIZE = 50;
 const CART_STORAGE_KEY = "b2bpart_cart_v1";
 const FORM_STORAGE_KEY = "b2bpart_order_form_v1";
 
+// Временно отключаем клиентский кабинет/заказ с главной страницы.
+// Админская авторизация и админские страницы при этом продолжают работать.
+const CUSTOMER_FEATURES_ENABLED = false;
+
 export default function Page() {
 const [query, setQuery] = useState("");
 const [brand, setBrand] = useState("ALL");
@@ -34,6 +38,9 @@ const [sessionUser, setSessionUser] = useState(null);
 const [isAdmin, setIsAdmin] = useState(false);
 
 const lastLoggedSearchRef = useRef("");
+
+// Если фича выключена, клиентские функции заказа не показываем никому.
+const canUseCustomerFeatures = CUSTOMER_FEATURES_ENABLED && !!sessionUser;
 
 useEffect(() => {
 let mounted = true;
@@ -154,7 +161,10 @@ cancelled = true;
 };
 }, []);
 
+// Оставляем код восстановления, но не используем его, пока клиентские функции выключены.
 useEffect(() => {
+if (!canUseCustomerFeatures) return;
+
 try {
 const savedCart = localStorage.getItem(CART_STORAGE_KEY);
 const savedForm = localStorage.getItem(FORM_STORAGE_KEY);
@@ -172,17 +182,21 @@ setCustomerComment(parsed.customerComment || "");
 } catch (e) {
 console.error("Failed to restore local state", e);
 }
-}, []);
+}, [canUseCustomerFeatures]);
 
 useEffect(() => {
+if (!canUseCustomerFeatures) return;
+
 try {
 localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
 } catch (e) {
 console.error("Failed to save cart", e);
 }
-}, [cart]);
+}, [cart, canUseCustomerFeatures]);
 
 useEffect(() => {
+if (!canUseCustomerFeatures) return;
+
 try {
 localStorage.setItem(
 FORM_STORAGE_KEY,
@@ -195,7 +209,7 @@ customerComment,
 } catch (e) {
 console.error("Failed to save order form", e);
 }
-}, [customerName, customerContact, customerComment]);
+}, [customerName, customerContact, customerComment, canUseCustomerFeatures]);
 
 useEffect(() => {
 function handleScroll() {
@@ -713,7 +727,6 @@ tableLayout: "fixed",
 <col style={{ width: "120px" }} />
 <col style={{ width: "90px" }} />
 {isAdmin ? <col style={{ width: "180px" }} /> : null}
-{sessionUser ? <col style={{ width: "130px" }} /> : null}
 </colgroup>
 
 <thead>
@@ -726,7 +739,6 @@ tableLayout: "fixed",
 "Цена с НДС (BYN)",
 "Дата прайса",
 ...(isAdmin ? ["Прайс"] : []),
-...(sessionUser ? ["Действие"] : []),
 ].map((h) => (
 <th
 key={h}
@@ -746,8 +758,6 @@ verticalAlign: "top",
 
 <tbody>
 {rows.map((r, idx) => {
-const added = isInCart(r);
-
 return (
 <tr key={`${r.brand}-${r.pn}-${r.price_byn}-${idx}`}>
 <td
@@ -834,32 +844,6 @@ verticalAlign: "top",
 {r.pricelist_name || "—"}
 </td>
 ) : null}
-
-{sessionUser ? (
-<td
-style={{
-padding: "8px",
-borderBottom: "1px solid #eee",
-verticalAlign: "top",
-}}
->
-<button
-onClick={() => addToCart(r)}
-style={{
-padding: "8px 10px",
-borderRadius: 10,
-border: added ? "1px solid #ccc" : "1px solid #111",
-background: added ? "#f3f3f3" : "#111",
-color: added ? "#111" : "#fff",
-cursor: "pointer",
-fontSize: 13,
-width: "100%",
-}}
->
-{added ? "Добавлено" : "В заказ"}
-</button>
-</td>
-) : null}
 </tr>
 );
 })}
@@ -867,7 +851,7 @@ width: "100%",
 {rows.length === 0 && (
 <tr>
 <td
-colSpan={6 + (isAdmin ? 1 : 0) + (sessionUser ? 1 : 0)}
+colSpan={6 + (isAdmin ? 1 : 0)}
 style={{ padding: "14px 8px", color: "#666" }}
 >
 {canSearch
@@ -908,35 +892,13 @@ fontSize: 14,
 </div>
 )}
 
-{sessionUser && cart.length > 0 && (
-<button
-onClick={() => setOrderOpen((v) => !v)}
-style={{
-position: "fixed",
-right: 24,
-bottom: showScrollTop ? 84 : 24,
-zIndex: 1000,
-padding: "12px 16px",
-borderRadius: 999,
-border: "1px solid #111",
-background: "#111",
-color: "#fff",
-cursor: "pointer",
-fontSize: 14,
-boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-}}
->
-{orderOpen ? `Скрыть заявку (${cartCount})` : `Заявка (${cartCount})`}
-</button>
-)}
-
 {showScrollTop && (
 <button
 onClick={scrollToTop}
 style={{
 position: "fixed",
 right: 24,
-bottom: sessionUser && cart.length > 0 ? (orderOpen ? 500 : 84) : 24,
+bottom: 24,
 zIndex: 1000,
 padding: "12px 16px",
 borderRadius: 999,
@@ -951,186 +913,7 @@ boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
 В начало списка
 </button>
 )}
-
-{sessionUser && orderOpen && (
-<div
-style={{
-position: "fixed",
-right: 24,
-bottom: 24,
-width: 420,
-maxWidth: "calc(100vw - 32px)",
-maxHeight: "80vh",
-overflow: "auto",
-zIndex: 999,
-background: "#fff",
-border: "1px solid #ddd",
-borderRadius: 16,
-boxShadow: "0 14px 34px rgba(0,0,0,0.18)",
-padding: 16,
-}}
->
-<div
-style={{
-display: "flex",
-justifyContent: "space-between",
-alignItems: "center",
-gap: 12,
-marginBottom: 12,
-}}
->
-<h3 style={{ margin: 0, fontSize: 18 }}>Заявка</h3>
-
-<button
-onClick={clearCart}
-style={{
-border: "none",
-background: "transparent",
-color: "#777",
-cursor: "pointer",
-fontSize: 13,
-}}
->
-Очистить
-</button>
-</div>
-
-<div style={{ display: "grid", gap: 10 }}>
-{cart.map((item) => (
-<div
-key={item.key}
-style={{
-border: "1px solid #eee",
-borderRadius: 12,
-padding: 10,
-}}
->
-<div style={{ fontWeight: 700, marginBottom: 4 }}>
-{item.brand} {item.pn}
-</div>
-
-<div
-style={{
-fontSize: 13,
-color: "#444",
-marginBottom: 8,
-lineHeight: 1.35,
-}}
->
-{item.name}
-</div>
-
-<div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>
-Цена: {item.displayPrice || "—"}
-</div>
-
-<div
-style={{
-display: "flex",
-justifyContent: "space-between",
-alignItems: "center",
-gap: 10,
-}}
->
-<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-<button
-onClick={() => changeCartQty(item.key, "dec")}
-style={{
-width: 28,
-height: 28,
-borderRadius: 8,
-border: "1px solid #ccc",
-background: "#fff",
-cursor: "pointer",
-}}
->
-−
-</button>
-
-<div style={{ minWidth: 22, textAlign: "center", fontSize: 14 }}>
-{item.orderQty}
-</div>
-
-<button
-onClick={() => changeCartQty(item.key, "inc")}
-style={{
-width: 28,
-height: 28,
-borderRadius: 8,
-border: "1px solid #ccc",
-background: "#fff",
-cursor: "pointer",
-}}
->
-+
-</button>
-</div>
-
-<button
-onClick={() => removeFromCart(item.key)}
-style={{
-border: "none",
-background: "transparent",
-color: "#a00",
-cursor: "pointer",
-fontSize: 13,
-}}
->
-Удалить
-</button>
-</div>
-</div>
-))}
-</div>
-
-<div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-<div
-style={{
-padding: "10px 12px",
-border: "1px solid #e5e5e5",
-borderRadius: 10,
-background: "#fafafa",
-fontSize: 14,
-color: "#444",
-}}
->
-Заявка будет отправлена от аккаунта{" "}
-<b>{customerName || sessionUser.email || "клиента"}</b>
-{customerContact ? <> · {customerContact}</> : null}
-</div>
-
-<textarea
-value={customerComment}
-onChange={(e) => setCustomerComment(e.target.value)}
-placeholder="Комментарий к заказу"
-rows={4}
-style={{
-width: "100%",
-padding: "10px 12px",
-border: "1px solid #ccc",
-borderRadius: 10,
-fontSize: 14,
-resize: "vertical",
-}}
-/>
-
-<button
-onClick={handleSubmitOrder}
-style={{
-padding: "12px 14px",
-borderRadius: 10,
-border: "1px solid #111",
-background: "#111",
-color: "#fff",
-cursor: "pointer",
-fontSize: 14,
-}}
->
-Отправить заявку
-</button>
-</div>
-</div>
-)}
 </div>
 );
 }
+
