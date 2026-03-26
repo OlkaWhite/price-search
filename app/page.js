@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 50;
 const CART_STORAGE_KEY = "b2bpart_cart_v1";
 const FORM_STORAGE_KEY = "b2bpart_order_form_v1";
 
