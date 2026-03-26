@@ -113,7 +113,7 @@ export default function Header() {
           </a>
         </div>
 
-        <div
+       /* <div
           style={{
             display: "flex",
             alignItems: "center",
@@ -153,7 +153,7 @@ export default function Header() {
             }}
           >
             Личный кабинет
-          </Link>
+        </Link>
 
           {!loading && user && <AdminLink userId={user.id} />}
 
@@ -173,7 +173,9 @@ export default function Header() {
             >
               Войти
             </Link>
-          )}
+          )} */
+
+
 
           {!loading && user && (
             <>
