@@ -4,12 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 const PAGE_SIZE = 50;
-const CART_STORAGE_KEY = "b2bpart_cart_v1";
-const FORM_STORAGE_KEY = "b2bpart_order_form_v1";
-
-// Временно отключаем клиентский кабинет/заказ с главной страницы.
-// Админская авторизация и админские страницы при этом продолжают работать.
-const CUSTOMER_FEATURES_ENABLED = false;
 
 export default function Page() {
 const [query, setQuery] = useState("");
@@ -28,19 +22,10 @@ const [page, setPage] = useState(0);
 const [hasMore, setHasMore] = useState(false);
 const [showScrollTop, setShowScrollTop] = useState(false);
 
-const [cart, setCart] = useState([]);
-const [orderOpen, setOrderOpen] = useState(false);
-const [customerName, setCustomerName] = useState("");
-const [customerContact, setCustomerContact] = useState("");
-const [customerComment, setCustomerComment] = useState("");
-
 const [sessionUser, setSessionUser] = useState(null);
 const [isAdmin, setIsAdmin] = useState(false);
 
 const lastLoggedSearchRef = useRef("");
-
-// Если фича выключена, клиентские функции заказа не показываем никому.
-const canUseCustomerFeatures = CUSTOMER_FEATURES_ENABLED && !!sessionUser;
 
 useEffect(() => {
 let mounted = true;
@@ -62,29 +47,13 @@ setSessionUser(session.user);
 
 const { data: profile } = await supabase
 .from("profiles")
-.select("contact_name, phone, telegram, email, role")
+.select("role")
 .eq("id", session.user.id)
 .maybeSingle();
 
 if (!mounted) return;
 
 setIsAdmin(profile?.role === "admin");
-
-if (profile) {
-if (profile.contact_name) setCustomerName(profile.contact_name);
-
-if (profile.phone) {
-setCustomerContact(profile.phone);
-} else if (profile.telegram) {
-setCustomerContact(profile.telegram);
-} else if (profile.email) {
-setCustomerContact(profile.email);
-} else if (session.user.email) {
-setCustomerContact(session.user.email);
-}
-} else if (session.user.email) {
-setCustomerContact(session.user.email);
-}
 }
 
 loadUserProfile();
@@ -104,29 +73,13 @@ setSessionUser(session.user);
 
 const { data: profile } = await supabase
 .from("profiles")
-.select("contact_name, phone, telegram, email, role")
+.select("role")
 .eq("id", session.user.id)
 .maybeSingle();
 
 if (!mounted) return;
 
 setIsAdmin(profile?.role === "admin");
-
-if (profile) {
-if (profile.contact_name) setCustomerName(profile.contact_name);
-
-if (profile.phone) {
-setCustomerContact(profile.phone);
-} else if (profile.telegram) {
-setCustomerContact(profile.telegram);
-} else if (profile.email) {
-setCustomerContact(profile.email);
-} else if (session.user.email) {
-setCustomerContact(session.user.email);
-}
-} else if (session.user.email) {
-setCustomerContact(session.user.email);
-}
 });
 
 return () => {
@@ -161,56 +114,6 @@ cancelled = true;
 };
 }, []);
 
-// Оставляем код восстановления, но не используем его, пока клиентские функции выключены.
-useEffect(() => {
-if (!canUseCustomerFeatures) return;
-
-try {
-const savedCart = localStorage.getItem(CART_STORAGE_KEY);
-const savedForm = localStorage.getItem(FORM_STORAGE_KEY);
-
-if (savedCart) {
-setCart(JSON.parse(savedCart));
-}
-
-if (savedForm) {
-const parsed = JSON.parse(savedForm);
-setCustomerName(parsed.customerName || "");
-setCustomerContact(parsed.customerContact || "");
-setCustomerComment(parsed.customerComment || "");
-}
-} catch (e) {
-console.error("Failed to restore local state", e);
-}
-}, [canUseCustomerFeatures]);
-
-useEffect(() => {
-if (!canUseCustomerFeatures) return;
-
-try {
-localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-} catch (e) {
-console.error("Failed to save cart", e);
-}
-}, [cart, canUseCustomerFeatures]);
-
-useEffect(() => {
-if (!canUseCustomerFeatures) return;
-
-try {
-localStorage.setItem(
-FORM_STORAGE_KEY,
-JSON.stringify({
-customerName,
-customerContact,
-customerComment,
-})
-);
-} catch (e) {
-console.error("Failed to save order form", e);
-}
-}, [customerName, customerContact, customerComment, canUseCustomerFeatures]);
-
 useEffect(() => {
 function handleScroll() {
 setShowScrollTop(window.scrollY > 700);
@@ -231,11 +134,6 @@ const visibleBrands = useMemo(() => {
 return canSearch ? searchBrands : brands;
 }, [canSearch, searchBrands, brands]);
 
-const cartCount = useMemo(
-() => cart.reduce((sum, item) => sum + item.orderQty, 0),
-[cart]
-);
-
 function escapeForOr(value) {
 return value
 .replace(/\\/g, "\\\\")
@@ -243,6 +141,14 @@ return value
 .replace(/\(/g, "\\(")
 .replace(/\)/g, "\\)")
 .replace(/"/g, '\\"');
+}
+
+function normalizeTextForSearch(value) {
+return (value || "")
+.toLowerCase()
+.replace(/ё/g, "е")
+.replace(/\s+/g, " ")
+.trim();
 }
 
 function resetSearchState() {
@@ -306,8 +212,22 @@ let req = supabase
 );
 
 if (q) {
-const safeQ = escapeForOr(q);
-req = req.or(`pn.ilike.*${safeQ}*,name.ilike.*${safeQ}*`);
+const tokens = normalizeTextForSearch(q)
+.split(" ")
+.map((part) => part.trim())
+.filter(Boolean);
+
+if (tokens.length === 1) {
+const safeToken = escapeForOr(tokens[0]);
+req = req.or(`pn.ilike.*${safeToken}*,name.ilike.*${safeToken}*`);
+} else {
+const andParts = tokens.map((token) => {
+const safeToken = escapeForOr(token);
+return `or(pn.ilike.*${safeToken}*,name.ilike.*${safeToken}*)`;
+});
+
+req = req.or(`and(${andParts.join(",")})`);
+}
 }
 
 if (brand !== "ALL") {
@@ -448,10 +368,6 @@ behavior: "smooth",
 });
 }
 
-function getRowKey(r) {
-return `${r.brand || ""}__${r.pn || ""}__${r.name || ""}`;
-}
-
 function getDisplayPrice(r) {
 if (typeof r.price_byn === "number") {
 return `${r.price_byn.toLocaleString("ru-RU", {
@@ -469,138 +385,6 @@ return String(r.price_usd);
 }
 
 return "";
-}
-
-function isInCart(r) {
-const key = getRowKey(r);
-return cart.some((item) => item.key === key);
-}
-
-function addToCart(r) {
-const key = getRowKey(r);
-
-setCart((prev) => {
-const existing = prev.find((item) => item.key === key);
-
-if (existing) {
-return prev.map((item) =>
-item.key === key ? { ...item, orderQty: item.orderQty + 1 } : item
-);
-}
-
-return [
-...prev,
-{
-key,
-brand: r.brand,
-pn: r.pn,
-name: r.name,
-stockQty: r.qty ?? "",
-price_byn: r.price_byn ?? null,
-displayPrice: getDisplayPrice(r),
-supplier: r.supplier || "",
-pricelist_name: r.pricelist_name || "",
-orderQty: 1,
-},
-];
-});
-
-setOrderOpen(true);
-}
-
-function removeFromCart(key) {
-setCart((prev) => prev.filter((item) => item.key !== key));
-}
-
-function changeCartQty(key, direction) {
-setCart((prev) =>
-prev
-.map((item) => {
-if (item.key !== key) return item;
-const nextQty =
-direction === "inc" ? item.orderQty + 1 : item.orderQty - 1;
-return { ...item, orderQty: nextQty };
-})
-.filter((item) => item.orderQty > 0)
-);
-}
-
-function clearCart() {
-setCart([]);
-}
-
-async function handleSubmitOrder() {
-if (cart.length === 0) {
-alert("Добавь хотя бы один товар в заявку.");
-return;
-}
-
-if (!customerName.trim() || !customerContact.trim()) {
-alert("Заполни имя и контакт в личном кабинете!");
-return;
-}
-
-const {
-data: { session },
-} = await supabase.auth.getSession();
-
-if (!session?.user) {
-alert("Чтобы сохранить заявку в личный кабинет, сначала войди в аккаунт.");
-window.location.href = "/login";
-return;
-}
-
-try {
-const { data: orderData, error: orderError } = await supabase
-.from("orders")
-.insert({
-user_id: session.user.id,
-customer_name: customerName.trim(),
-customer_contact: customerContact.trim(),
-customer_comment: customerComment.trim(),
-status: "new",
-})
-.select("id")
-.single();
-
-if (orderError) {
-alert("Ошибка при создании заявки: " + orderError.message);
-return;
-}
-
-const orderId = orderData.id;
-
-const itemsPayload = cart.map((item) => ({
-order_id: orderId,
-brand: item.brand,
-pn: item.pn,
-name: item.name,
-order_qty: item.orderQty,
-stock_qty: item.stockQty,
-display_price: item.displayPrice,
-price_byn: typeof item.price_byn === "number" ? item.price_byn : null,
-}));
-
-const { error: itemsError } = await supabase
-.from("order_items")
-.insert(itemsPayload);
-
-if (itemsError) {
-alert(
-"Заявка создана, но товары не сохранились: " + itemsError.message
-);
-return;
-}
-
-alert(`Заявка #${orderId} сохранена в личный кабинет.`);
-
-setCart([]);
-setCustomerComment("");
-setOrderOpen(false);
-} catch (e) {
-console.error(e);
-alert("Что-то пошло не так при сохранении заявки.");
-}
 }
 
 return (
@@ -916,4 +700,3 @@ boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
 </div>
 );
 }
-
