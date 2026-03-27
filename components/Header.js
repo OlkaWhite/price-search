@@ -109,7 +109,7 @@ whiteSpace: "nowrap"
 }}
 >
 <span style={{ fontSize: 15 }}>✈️</span>
-<span>Связаться с разработчиком</span>
+<span>Связаться с менеджером</span>
 </a>
 </div>
 
