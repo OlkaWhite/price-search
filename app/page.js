@@ -303,11 +303,11 @@ setHasMore(false);
 
 const foundCount = await runSearch(true);
 
-await logSearchAction({
+logSearchAction({
 queryText: query,
 brandValue: brand,
 resultsCount: foundCount,
-});
+}).catch((e) => console.error("logSearchAction error:", e));
 }
 
 useEffect(() => {
