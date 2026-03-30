@@ -10,12 +10,10 @@ const [query, setQuery] = useState("");
 const [brand, setBrand] = useState("ALL");
 
 const [brands, setBrands] = useState([]);
-const [searchBrands, setSearchBrands] = useState([]);
 const [rows, setRows] = useState([]);
 
 const [loading, setLoading] = useState(false);
 const [loadingMore, setLoadingMore] = useState(false);
-const [loadingBrands, setLoadingBrands] = useState(false);
 const [errorText, setErrorText] = useState("");
 
 const [page, setPage] = useState(0);
@@ -103,7 +101,10 @@ setErrorText(error.message);
 return;
 }
 
-const uniq = (data || []).map((x) => x.brand).filter(Boolean);
+const uniq = Array.from(
+new Set((data || []).map((x) => x.brand).filter(Boolean))
+).sort((a, b) => a.localeCompare(b, "ru"));
+
 setBrands(uniq);
 }
 
@@ -130,6 +131,12 @@ const canSearch = useMemo(
 [query, brand]
 );
 
+const searchBrands = useMemo(() => {
+return Array.from(new Set(rows.map((x) => x.brand).filter(Boolean))).sort((a, b) =>
+a.localeCompare(b, "ru")
+);
+}, [rows]);
+
 const visibleBrands = useMemo(() => {
 return canSearch ? searchBrands : brands;
 }, [canSearch, searchBrands, brands]);
@@ -144,20 +151,14 @@ return value
 }
 
 function normalizeTextForSearch(value) {
-return (value || "")
-.toLowerCase()
-.replace(/ё/g, "е")
-.replace(/\s+/g, " ")
-.trim();
+return (value || "").toLowerCase().replace(/ё/g, "е").replace(/\s+/g, " ").trim();
 }
 
 function resetSearchState() {
 setLoading(false);
 setLoadingMore(false);
-setLoadingBrands(false);
 setErrorText("");
 setRows([]);
-setSearchBrands([]);
 setPage(0);
 setHasMore(false);
 }
@@ -239,37 +240,6 @@ req = req.order("price_byn", { ascending: true, nullsFirst: false });
 return req;
 }
 
-async function loadSearchBrands() {
-if (!canSearch) {
-setSearchBrands([]);
-setLoadingBrands(false);
-return;
-}
-
-setLoadingBrands(true);
-
-try {
-const q = query.trim() || null;
-
-const { data, error } = await supabase.rpc("search_distinct_brands", {
-search_text: q,
-});
-
-if (error) {
-console.error("Brands load error:", error);
-setSearchBrands([]);
-} else {
-const uniq = (data || []).map((x) => x.brand).filter(Boolean);
-setSearchBrands(uniq);
-}
-} catch (e) {
-console.error("Brands load failed:", e);
-setSearchBrands([]);
-} finally {
-setLoadingBrands(false);
-}
-}
-
 async function runSearch(reset = true) {
 const nextPage = reset ? 0 : page + 1;
 const from = nextPage * PAGE_SIZE;
@@ -328,7 +298,6 @@ if (!canSearch || loading || loadingMore) return;
 
 setErrorText("");
 setRows([]);
-setSearchBrands([]);
 setPage(0);
 setHasMore(false);
 
@@ -339,13 +308,6 @@ queryText: query,
 brandValue: brand,
 resultsCount: foundCount,
 });
-
-if (foundCount > 0) {
-loadSearchBrands();
-} else {
-setSearchBrands([]);
-setLoadingBrands(false);
-}
 }
 
 useEffect(() => {
@@ -474,10 +436,6 @@ fontSize: 14,
 <div style={{ color: "#666", fontSize: 13 }}>
 {rows.length > 0 ? `Загружено: ${rows.length}` : " "}
 </div>
-
-{loadingBrands && (
-<div style={{ color: "#666", fontSize: 13 }}>Обновляю бренды...</div>
-)}
 </div>
 
 {errorText && (
