@@ -10,10 +10,12 @@ const [query, setQuery] = useState("");
 const [brand, setBrand] = useState("ALL");
 
 const [brands, setBrands] = useState([]);
+const [searchBrands, setSearchBrands] = useState([]);
 const [rows, setRows] = useState([]);
 
 const [loading, setLoading] = useState(false);
 const [loadingMore, setLoadingMore] = useState(false);
+const [loadingBrands, setLoadingBrands] = useState(false);
 const [errorText, setErrorText] = useState("");
 
 const [page, setPage] = useState(0);
@@ -131,12 +133,6 @@ const canSearch = useMemo(
 [query, brand]
 );
 
-const searchBrands = useMemo(() => {
-return Array.from(new Set(rows.map((x) => x.brand).filter(Boolean))).sort((a, b) =>
-a.localeCompare(b, "ru")
-);
-}, [rows]);
-
 const visibleBrands = useMemo(() => {
 return canSearch ? searchBrands : brands;
 }, [canSearch, searchBrands, brands]);
@@ -157,8 +153,10 @@ return (value || "").toLowerCase().replace(/ё/g, "е").replace(/\s+/g, " ").tri
 function resetSearchState() {
 setLoading(false);
 setLoadingMore(false);
+setLoadingBrands(false);
 setErrorText("");
 setRows([]);
+setSearchBrands([]);
 setPage(0);
 setHasMore(false);
 }
@@ -203,16 +201,11 @@ console.error("Failed to write search log", e);
 }
 }
 
-function buildRowsQuery() {
+function applyTextSearch(req) {
 const q = query.trim();
 
-let req = supabase
-.from("offers_view")
-.select(
-"id,brand,pn,name,qty,price_byn,price_rub,price_usd,supplier,pricelist_name,last_upload_at"
-);
+if (!q) return req;
 
-if (q) {
 const tokens = normalizeTextForSearch(q)
 .split(" ")
 .map((part) => part.trim())
@@ -220,16 +213,25 @@ const tokens = normalizeTextForSearch(q)
 
 if (tokens.length === 1) {
 const safeToken = escapeForOr(tokens[0]);
-req = req.or(`pn.ilike.*${safeToken}*,name.ilike.*${safeToken}*`);
-} else {
+return req.or(`pn.ilike.*${safeToken}*,name.ilike.*${safeToken}*`);
+}
+
 const andParts = tokens.map((token) => {
 const safeToken = escapeForOr(token);
 return `or(pn.ilike.*${safeToken}*,name.ilike.*${safeToken}*)`;
 });
 
-req = req.or(`and(${andParts.join(",")})`);
+return req.or(`and(${andParts.join(",")})`);
 }
-}
+
+function buildRowsQuery() {
+let req = supabase
+.from("offers_view")
+.select(
+"id,brand,pn,name,qty,price_byn,price_rub,price_usd,supplier,pricelist_name,last_upload_at"
+);
+
+req = applyTextSearch(req);
 
 if (brand !== "ALL") {
 req = req.eq("brand", brand);
@@ -238,6 +240,46 @@ req = req.eq("brand", brand);
 req = req.order("price_byn", { ascending: true, nullsFirst: false });
 
 return req;
+}
+
+function buildBrandsQuery() {
+let req = supabase.from("offers_view").select("brand");
+
+// ВАЖНО:
+// бренды грузим по текущему поисковому запросу,
+// но НЕ режем по выбранному brand, чтобы в фильтре оставались все варианты
+req = applyTextSearch(req);
+
+return req;
+}
+
+async function loadSearchBrands() {
+if (!canSearch) {
+setSearchBrands([]);
+setLoadingBrands(false);
+return;
+}
+
+setLoadingBrands(true);
+
+try {
+const { data, error } = await buildBrandsQuery();
+
+if (error) {
+throw error;
+}
+
+const uniq = Array.from(
+new Set((data || []).map((x) => x.brand).filter(Boolean))
+).sort((a, b) => a.localeCompare(b, "ru"));
+
+setSearchBrands(uniq);
+} catch (e) {
+console.error("Brands load failed:", e);
+setSearchBrands([]);
+} finally {
+setLoadingBrands(false);
+}
 }
 
 async function runSearch(reset = true) {
@@ -298,10 +340,11 @@ if (!canSearch || loading || loadingMore) return;
 
 setErrorText("");
 setRows([]);
+setSearchBrands([]);
 setPage(0);
 setHasMore(false);
 
-const foundCount = await runSearch(true);
+const [foundCount] = await Promise.all([runSearch(true), loadSearchBrands()]);
 
 logSearchAction({
 queryText: query,
@@ -436,6 +479,10 @@ fontSize: 14,
 <div style={{ color: "#666", fontSize: 13 }}>
 {rows.length > 0 ? `Загружено: ${rows.length}` : " "}
 </div>
+
+{loadingBrands && (
+<div style={{ color: "#666", fontSize: 13 }}>Обновляю бренды...</div>
+)}
 </div>
 
 {errorText && (
