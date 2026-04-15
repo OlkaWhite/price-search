@@ -429,7 +429,7 @@ export default function Page() {
         padding: "20px 16px 120px",
       }}
     >
-      <p style={{ marginTop: 8, color: "#ff0000", fontSize: 15 }}>
+      <p style={{ marginTop: 8, color: "#666", fontSize: 15 }}>
         Введи минимум 2 символа. Ищет по <b>P/N</b> и по <b>наименованию</b>.
         Фильтр по бренду справа от поисковой строки.
       </p>
