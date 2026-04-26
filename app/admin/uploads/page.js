@@ -3,492 +3,603 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 
-const STATUS_OPTIONS = ["new", "ok", "warning", "error"];
-
 export default function AdminUploadsPage() {
-const [suppliers, setSuppliers] = useState([]);
-const [logs, setLogs] = useState([]);
-const [loading, setLoading] = useState(true);
-const [saving, setSaving] = useState(false);
-const [errorText, setErrorText] = useState("");
-const [message, setMessage] = useState("");
+  const [suppliers, setSuppliers] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorText, setErrorText] = useState("");
+  const [message, setMessage] = useState("");
 
-const [supplierId, setSupplierId] = useState("");
-const [fileName, setFileName] = useState("");
-const [priceType, setPriceType] = useState("rub");
-const [rowsTotal, setRowsTotal] = useState("");
-const [rowsInserted, setRowsInserted] = useState("");
-const [rowsSkipped, setRowsSkipped] = useState("");
-const [status, setStatus] = useState("ok");
-const [errorLogText, setErrorLogText] = useState("");
+  const [supplierId, setSupplierId] = useState("");
+  const [priceType, setPriceType] = useState("rub");
+  const [file, setFile] = useState(null);
+  const [fileName, setFileName] = useState("");
 
-async function loadPageData() {
-setLoading(true);
-setErrorText("");
-setMessage("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [commitLoading, setCommitLoading] = useState(false);
 
-try {
-const [suppliersRes, logsRes] = await Promise.all([
-supabase
-.from("pricelists")
-.select("id, supplier, name, price_type")
-.order("id", { ascending: true }),
+  const [previewStats, setPreviewStats] = useState(null);
+  const [previewRows, setPreviewRows] = useState([]);
+  const [previewReady, setPreviewReady] = useState(false);
 
-supabase
-.from("price_upload_logs")
-.select(`
-id,
-supplier_id,
-uploaded_by,
-file_name,
-price_type,
-rows_total,
-rows_inserted,
-rows_skipped,
-status,
-error_text,
-created_at
-`)
-.order("created_at", { ascending: false })
-.limit(200)
-]);
+  async function loadPageData() {
+    setLoading(true);
+    setErrorText("");
+    setMessage("");
 
-if (suppliersRes.error) throw suppliersRes.error;
-if (logsRes.error) throw logsRes.error;
+    try {
+      const [suppliersRes, logsRes] = await Promise.all([
+        supabase
+          .from("pricelists")
+          .select("id, supplier, name, price_type")
+          .order("id", { ascending: true }),
 
-const nextSuppliers = suppliersRes.data || [];
-const nextLogs = logsRes.data || [];
+        supabase
+          .from("price_upload_logs")
+          .select(`
+            id,
+            supplier_id,
+            uploaded_by,
+            file_name,
+            price_type,
+            rows_total,
+            rows_inserted,
+            rows_skipped,
+            status,
+            error_text,
+            created_at
+          `)
+          .order("created_at", { ascending: false })
+          .limit(200)
+      ]);
 
-setSuppliers(nextSuppliers);
-setLogs(nextLogs);
+      if (suppliersRes.error) throw suppliersRes.error;
+      if (logsRes.error) throw logsRes.error;
 
-if (!supplierId && nextSuppliers.length > 0) {
-setSupplierId(String(nextSuppliers[0].id));
-setPriceType(nextSuppliers[0].price_type || "rub");
-}
-} catch (err) {
-console.error("Uploads page load error:", err);
-setErrorText(err?.message || "Не удалось загрузить данные страницы.");
-} finally {
-setLoading(false);
-}
-}
+      const nextSuppliers = suppliersRes.data || [];
+      const nextLogs = logsRes.data || [];
 
-useEffect(() => {
-loadPageData();
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+      setSuppliers(nextSuppliers);
+      setLogs(nextLogs);
 
-const suppliersMap = useMemo(() => {
-return Object.fromEntries(
-suppliers.map((item) => [String(item.id), item])
-);
-}, [suppliers]);
+      if (!supplierId && nextSuppliers.length > 0) {
+        setSupplierId(String(nextSuppliers[0].id));
+        setPriceType(nextSuppliers[0].price_type || "rub");
+      }
+    } catch (err) {
+      console.error("Uploads page load error:", err);
+      setErrorText(err?.message || "Не удалось загрузить данные страницы.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
-function handleSupplierChange(value) {
-setSupplierId(value);
-const supplier = suppliersMap[value];
-if (supplier?.price_type) {
-setPriceType(supplier.price_type);
-}
-}
+  useEffect(() => {
+    loadPageData();
+  }, []);
 
-async function handleSaveLog(e) {
-e.preventDefault();
+  const suppliersMap = useMemo(() => {
+    return Object.fromEntries(suppliers.map((item) => [String(item.id), item]));
+  }, [suppliers]);
 
-if (!supplierId) {
-setErrorText("Выбери поставщика.");
-return;
-}
+  function handleSupplierChange(value) {
+    setSupplierId(value);
+    const supplier = suppliersMap[value];
+    if (supplier?.price_type) {
+      setPriceType(supplier.price_type);
+    }
 
-setSaving(true);
-setErrorText("");
-setMessage("");
+    setPreviewStats(null);
+    setPreviewRows([]);
+    setPreviewReady(false);
+    setMessage("");
+    setErrorText("");
+  }
 
-try {
-const {
-data: { user }
-} = await supabase.auth.getUser();
+  async function handlePreview() {
+    if (!supplierId) {
+      setErrorText("Выбери поставщика.");
+      return;
+    }
 
-const payload = {
-supplier_id: Number(supplierId),
-uploaded_by: user?.id || null,
-file_name: fileName.trim() || null,
-price_type: priceType || null,
-rows_total: rowsTotal === "" ? 0 : Number(rowsTotal),
-rows_inserted: rowsInserted === "" ? 0 : Number(rowsInserted),
-rows_skipped: rowsSkipped === "" ? 0 : Number(rowsSkipped),
-status,
-error_text: errorLogText.trim() || null
-};
+    if (!file) {
+      setErrorText("Выбери CSV-файл.");
+      return;
+    }
 
-const { error } = await supabase
-.from("price_upload_logs")
-.insert(payload);
+    setPreviewLoading(true);
+    setErrorText("");
+    setMessage("");
+    setPreviewReady(false);
+    setPreviewStats(null);
+    setPreviewRows([]);
 
-if (error) {
-throw error;
-}
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("supplierId", supplierId);
+      formData.append("priceType", priceType);
 
-const { error: updatePricelistError } = await supabase
-.from("pricelists")
-.update({
-last_upload_at: new Date().toISOString(),
-price_type: priceType
-})
-.eq("id", Number(supplierId));
+      const res = await fetch("/api/admin/uploads/preview", {
+        method: "POST",
+        body: formData
+      });
 
-if (updatePricelistError) {
-throw updatePricelistError;
-}
+      const data = await res.json();
 
-setMessage("Лог загрузки сохранён.");
+      if (!res.ok) {
+        throw new Error(data?.error || "Не удалось проверить файл.");
+      }
 
-setFileName("");
-setRowsTotal("");
-setRowsInserted("");
-setRowsSkipped("");
-setStatus("ok");
-setErrorLogText("");
+      setPreviewStats(data.stats || null);
+      setPreviewRows(data.preview || []);
+      setPreviewReady(true);
+      setMessage("Файл проверен. Можно загружать прайс.");
+    } catch (err) {
+      console.error("Preview error:", err);
+      setErrorText(err?.message || "Ошибка проверки файла.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
 
-await loadPageData();
-} catch (err) {
-console.error("Save upload log error:", err);
-setErrorText(err?.message || "Не удалось сохранить лог загрузки.");
-} finally {
-setSaving(false);
-}
-}
+  async function handleCommit() {
+    if (!supplierId) {
+      setErrorText("Выбери поставщика.");
+      return;
+    }
 
-return (
-<div>
-<div style={{ marginBottom: 20 }}>
-<h1 style={{ margin: 0 }}>Загрузка прайсов</h1>
-<p style={{ marginTop: 8, color: "#666" }}>
-Фиксация загрузок прайсов и история импортов
-</p>
-</div>
+    if (!previewReady) {
+      setErrorText("Сначала проверь файл.");
+      return;
+    }
 
-{message && (
-<div
-style={{
-marginBottom: 16,
-padding: 12,
-borderRadius: 10,
-border: "1px solid #cce5cc",
-background: "#f3fff3",
-color: "#2e6b2e"
-}}
->
-{message}
-</div>
-)}
+    setCommitLoading(true);
+    setErrorText("");
+    setMessage("");
 
-{errorText && (
-<div
-style={{
-marginBottom: 16,
-padding: 12,
-borderRadius: 10,
-border: "1px solid #f1b5b5",
-background: "#fff5f5",
-color: "#9b1c1c"
-}}
->
-{errorText}
-</div>
-)}
+    try {
+      const res = await fetch("/api/admin/uploads/commit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          supplierId,
+          fileName,
+          priceType
+        })
+      });
 
-{loading ? (
-<div>Загружаю страницу...</div>
-) : (
-<div
-style={{
-display: "grid",
-gridTemplateColumns: "0.9fr 1.1fr",
-gap: 20
-}}
->
-<div
-style={{
-border: "1px solid #e5e5e5",
-borderRadius: 16,
-background: "#fff",
-padding: 20,
-alignSelf: "start"
-}}
->
-<h2 style={{ marginTop: 0 }}>Новая загрузка</h2>
+      const data = await res.json();
 
-<form onSubmit={handleSaveLog} style={{ display: "grid", gap: 14 }}>
-<Field label="Поставщик">
-<select
-value={supplierId}
-onChange={(e) => handleSupplierChange(e.target.value)}
-style={inputStyle}
->
-{suppliers.map((item) => (
-<option key={item.id} value={item.id}>
-#{item.id} — {item.supplier || "—"} / {item.name || "—"}
-</option>
-))}
-</select>
-</Field>
+      if (!res.ok) {
+        throw new Error(data?.error || "Не удалось загрузить прайс.");
+      }
 
-<Field label="Имя файла">
-<input
-value={fileName}
-onChange={(e) => setFileName(e.target.value)}
-placeholder="Например: px_portal2.csv"
-style={inputStyle}
-/>
-</Field>
+      setMessage(
+        `Прайс успешно загружен. Вставлено: ${data.stats.rowsInserted}, пропущено: ${data.stats.rowsSkipped}.`
+      );
 
-<Field label="Тип прайса">
-<select
-value={priceType}
-onChange={(e) => setPriceType(e.target.value)}
-style={inputStyle}
->
-<option value="rub">rub</option>
-<option value="usd">usd</option>
-</select>
-</Field>
+      setFile(null);
+      setFileName("");
+      setPreviewStats(null);
+      setPreviewRows([]);
+      setPreviewReady(false);
 
-<Field label="Всего строк">
-<input
-value={rowsTotal}
-onChange={(e) => setRowsTotal(e.target.value)}
-placeholder="Например: 12500"
-style={inputStyle}
-/>
-</Field>
+      const input = document.getElementById("csv-upload-input");
+      if (input) {
+        input.value = "";
+      }
 
-<Field label="Вставлено строк">
-<input
-value={rowsInserted}
-onChange={(e) => setRowsInserted(e.target.value)}
-placeholder="Например: 12340"
-style={inputStyle}
-/>
-</Field>
+      await loadPageData();
+    } catch (err) {
+      console.error("Commit error:", err);
+      setErrorText(err?.message || "Ошибка загрузки прайса.");
+    } finally {
+      setCommitLoading(false);
+    }
+  }
 
-<Field label="Пропущено строк">
-<input
-value={rowsSkipped}
-onChange={(e) => setRowsSkipped(e.target.value)}
-placeholder="Например: 160"
-style={inputStyle}
-/>
-</Field>
+  return (
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ margin: 0 }}>Загрузка прайсов</h1>
+        <p style={{ marginTop: 8, color: "#666" }}>
+          Загрузка CSV во временную таблицу, проверка и перенос в offers
+        </p>
+      </div>
 
-<Field label="Статус">
-<select
-value={status}
-onChange={(e) => setStatus(e.target.value)}
-style={inputStyle}
->
-{STATUS_OPTIONS.map((item) => (
-<option key={item} value={item}>
-{item}
-</option>
-))}
-</select>
-</Field>
+      {message && (
+        <div style={successBoxStyle}>
+          {message}
+        </div>
+      )}
 
-<Field label="Текст ошибки / комментарий">
-<textarea
-value={errorLogText}
-onChange={(e) => setErrorLogText(e.target.value)}
-rows={5}
-placeholder="Например: 160 строк без P/N были пропущены"
-style={{
-...inputStyle,
-resize: "vertical"
-}}
-/>
-</Field>
+      {errorText && (
+        <div style={errorBoxStyle}>
+          {errorText}
+        </div>
+      )}
 
-<button
-type="submit"
-disabled={saving}
-style={{
-padding: "12px 14px",
-borderRadius: 10,
-border: "1px solid #111",
-background: saving ? "#ddd" : "#111",
-color: saving ? "#333" : "#fff",
-cursor: saving ? "default" : "pointer",
-fontSize: 14
-}}
->
-{saving ? "Сохраняю..." : "Сохранить лог загрузки"}
-</button>
-</form>
+      {loading ? (
+        <div>Загружаю страницу...</div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "0.95fr 1.05fr",
+            gap: 20
+          }}
+        >
+          <div style={cardStyle}>
+            <h2 style={{ marginTop: 0 }}>Новая загрузка</h2>
 
-<div
-style={{
-marginTop: 18,
-padding: 12,
-borderRadius: 12,
-background: "#fafafa",
-border: "1px solid #eee",
-fontSize: 13,
-color: "#555",
-lineHeight: 1.5
-}}
->
-Рабочий процесс сейчас такой:
-<br />
-1. Очистить <b>offers_import</b>
-<br />
-2. Загрузить CSV во временную таблицу
-<br />
-3. Выполнить SQL на перенос в <b>offers</b>
-<br />
-4. Зафиксировать результат здесь в журнале загрузок
-</div>
-</div>
+            <div style={{ display: "grid", gap: 14 }}>
+              <Field label="Поставщик">
+                <select
+                  value={supplierId}
+                  onChange={(e) => handleSupplierChange(e.target.value)}
+                  style={inputStyle}
+                >
+                  {suppliers.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      #{item.id} — {item.supplier || "—"} / {item.name || "—"}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
-<div
-style={{
-border: "1px solid #e5e5e5",
-borderRadius: 16,
-background: "#fff",
-overflow: "hidden"
-}}
->
-<div style={{ padding: "18px 20px 0" }}>
-<h2 style={{ marginTop: 0 }}>История загрузок</h2>
-</div>
+              <Field label="Тип прайса">
+                <select
+                  value={priceType}
+                  onChange={(e) => setPriceType(e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="rub">rub</option>
+                  <option value="usd">usd</option>
+                </select>
+              </Field>
 
-{logs.length === 0 ? (
-<div style={{ padding: 20, color: "#666" }}>Логов пока нет.</div>
-) : (
-<div style={{ overflowX: "auto" }}>
-<table
-style={{
-width: "100%",
-borderCollapse: "collapse",
-fontSize: 14
-}}
->
-<thead>
-<tr>
-{[
-"Дата",
-"Поставщик",
-"Файл",
-"Тип",
-"Всего",
-"Вставлено",
-"Пропущено",
-"Статус",
-"Комментарий"
-].map((h) => (
-<th
-key={h}
-style={{
-textAlign: "left",
-padding: "12px 10px",
-borderBottom: "1px solid #eee",
-background: "#fafafa",
-whiteSpace: "nowrap"
-}}
->
-{h}
-</th>
-))}
-</tr>
-</thead>
-<tbody>
-{logs.map((log) => {
-const supplier = suppliers.find(
-(item) => item.id === log.supplier_id
-);
+              <Field label="CSV-файл">
+                <input
+                  id="csv-upload-input"
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => {
+                    const nextFile = e.target.files?.[0] || null;
+                    setFile(nextFile);
+                    setFileName(nextFile?.name || "");
+                    setPreviewStats(null);
+                    setPreviewRows([]);
+                    setPreviewReady(false);
+                    setMessage("");
+                    setErrorText("");
+                  }}
+                  style={inputStyle}
+                />
+              </Field>
 
-return (
-<tr key={log.id}>
-<td style={tdStyle}>
-{log.created_at
-? new Date(log.created_at).toLocaleString()
-: "—"}
-</td>
-<td style={tdStyle}>
-{supplier
-? `#${supplier.id} — ${supplier.supplier || "—"}`
-: log.supplier_id || "—"}
-</td>
-<td style={tdStyle}>{log.file_name || "—"}</td>
-<td style={tdStyle}>{log.price_type || "—"}</td>
-<td style={tdStyle}>{log.rows_total ?? 0}</td>
-<td style={tdStyle}>{log.rows_inserted ?? 0}</td>
-<td style={tdStyle}>{log.rows_skipped ?? 0}</td>
-<td style={tdStyle}>
-<StatusBadge status={log.status} />
-</td>
-<td style={tdStyle}>{log.error_text || "—"}</td>
-</tr>
-);
-})}
-</tbody>
-</table>
-</div>
-)}
-</div>
-</div>
-)}
-</div>
-);
+              {fileName && (
+                <div style={{ fontSize: 13, color: "#555" }}>
+                  Выбран файл: <b>{fileName}</b>
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={handlePreview}
+                  disabled={previewLoading || commitLoading}
+                  style={{
+                    ...buttonPrimaryStyle,
+                    opacity: previewLoading || commitLoading ? 0.7 : 1
+                  }}
+                >
+                  {previewLoading ? "Проверяю..." : "Проверить файл"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCommit}
+                  disabled={!previewReady || previewLoading || commitLoading}
+                  style={{
+                    ...buttonDarkStyle,
+                    opacity: !previewReady || previewLoading || commitLoading ? 0.6 : 1
+                  }}
+                >
+                  {commitLoading ? "Загружаю..." : "Загрузить прайс"}
+                </button>
+              </div>
+            </div>
+
+            <div style={infoBoxStyle}>
+              Процесс работы:
+              <br />
+              1. Выбираешь поставщика
+              <br />
+              2. Прикрепляешь CSV
+              <br />
+              3. Нажимаешь <b>Проверить файл</b>
+              <br />
+              4. Смотришь превью и статистику
+              <br />
+              5. Нажимаешь <b>Загрузить прайс</b>
+            </div>
+
+            {previewStats && (
+              <div style={{ marginTop: 18 }}>
+                <h3 style={{ marginBottom: 10 }}>Статистика проверки</h3>
+
+                <div style={statsGridStyle}>
+                  <StatCard label="Всего строк" value={previewStats.rowsTotal} />
+                  <StatCard label="Без P/N" value={previewStats.rowsWithoutPn} />
+                  <StatCard label="Пустой brand" value={previewStats.rowsEmptyBrand} />
+                  <StatCard label="Пустой name" value={previewStats.rowsEmptyName} />
+                  <StatCard label="Готово к загрузке" value={previewStats.rowsReady} />
+                </div>
+              </div>
+            )}
+
+            {previewRows.length > 0 && (
+              <div style={{ marginTop: 18 }}>
+                <h3 style={{ marginBottom: 10 }}>Превью файла</h3>
+
+                <div style={{ overflowX: "auto", border: "1px solid #eee", borderRadius: 12 }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: 13
+                    }}
+                  >
+                    <thead>
+                      <tr>
+                        {["brand", "pn", "name", "qty", "price_rub", "price_usd"].map((h) => (
+                          <th
+                            key={h}
+                            style={{
+                              textAlign: "left",
+                              padding: "10px 8px",
+                              borderBottom: "1px solid #eee",
+                              background: "#fafafa",
+                              whiteSpace: "nowrap"
+                            }}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewRows.map((row, idx) => (
+                        <tr key={idx}>
+                          <td style={tdStyle}>{row.brand || "—"}</td>
+                          <td style={tdStyle}>{row.pn || "—"}</td>
+                          <td style={tdStyle}>{row.name || "—"}</td>
+                          <td style={tdStyle}>{row.qty || "—"}</td>
+                          <td style={tdStyle}>{row.price_rub || "—"}</td>
+                          <td style={tdStyle}>{row.price_usd || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+            <div style={{ padding: "18px 20px 0" }}>
+              <h2 style={{ marginTop: 0 }}>История загрузок</h2>
+            </div>
+
+            {logs.length === 0 ? (
+              <div style={{ padding: 20, color: "#666" }}>Логов пока нет.</div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 14
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      {[
+                        "Дата",
+                        "Поставщик",
+                        "Файл",
+                        "Тип",
+                        "Всего",
+                        "Вставлено",
+                        "Пропущено",
+                        "Статус",
+                        "Комментарий"
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          style={{
+                            textAlign: "left",
+                            padding: "12px 10px",
+                            borderBottom: "1px solid #eee",
+                            background: "#fafafa",
+                            whiteSpace: "nowrap"
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.map((log) => {
+                      const supplier = suppliers.find((item) => item.id === log.supplier_id);
+
+                      return (
+                        <tr key={log.id}>
+                          <td style={tdStyle}>
+                            {log.created_at ? new Date(log.created_at).toLocaleString() : "—"}
+                          </td>
+                          <td style={tdStyle}>
+                            {supplier
+                              ? `#${supplier.id} — ${supplier.supplier || "—"} / ${supplier.name || "—"}`
+                              : log.supplier_id || "—"}
+                          </td>
+                          <td style={tdStyle}>{log.file_name || "—"}</td>
+                          <td style={tdStyle}>{log.price_type || "—"}</td>
+                          <td style={tdStyle}>{log.rows_total ?? 0}</td>
+                          <td style={tdStyle}>{log.rows_inserted ?? 0}</td>
+                          <td style={tdStyle}>{log.rows_skipped ?? 0}</td>
+                          <td style={tdStyle}>
+                            <StatusBadge status={log.status} />
+                          </td>
+                          <td style={tdStyle}>{log.error_text || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Field({ label, children }) {
-return (
-<div>
-<div style={{ marginBottom: 8, fontSize: 13, color: "#666" }}>{label}</div>
-{children}
-</div>
-);
+  return (
+    <div>
+      <div style={{ marginBottom: 8, fontSize: 13, color: "#666" }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function StatCard({ label, value }) {
+  return (
+    <div
+      style={{
+        border: "1px solid #eee",
+        borderRadius: 12,
+        padding: 12,
+        background: "#fafafa"
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 700 }}>{value ?? 0}</div>
+    </div>
+  );
 }
 
 function StatusBadge({ status }) {
-const map = {
-new: { label: "new", bg: "#eef6ff", color: "#1d4ed8" },
-ok: { label: "ok", bg: "#ecfdf5", color: "#15803d" },
-warning: { label: "warning", bg: "#fff7ed", color: "#c2410c" },
-error: { label: "error", bg: "#fef2f2", color: "#b91c1c" }
-};
+  const map = {
+    new: { label: "new", bg: "#eef6ff", color: "#1d4ed8" },
+    ok: { label: "ok", bg: "#ecfdf5", color: "#15803d" },
+    warning: { label: "warning", bg: "#fff7ed", color: "#c2410c" },
+    error: { label: "error", bg: "#fef2f2", color: "#b91c1c" }
+  };
 
-const item = map[status] || { label: status || "—", bg: "#f3f4f6", color: "#374151" };
+  const item = map[status] || {
+    label: status || "—",
+    bg: "#f3f4f6",
+    color: "#374151"
+  };
 
-return (
-<span
-style={{
-display: "inline-block",
-padding: "6px 10px",
-borderRadius: 999,
-background: item.bg,
-color: item.color,
-fontSize: 12,
-fontWeight: 600
-}}
->
-{item.label}
-</span>
-);
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "6px 10px",
+        borderRadius: 999,
+        background: item.bg,
+        color: item.color,
+        fontSize: 12,
+        fontWeight: 600
+      }}
+    >
+      {item.label}
+    </span>
+  );
 }
 
 const inputStyle = {
-width: "100%",
-padding: "10px 12px",
-border: "1px solid #ccc",
-borderRadius: 10,
-fontSize: 14,
-boxSizing: "border-box"
+  width: "100%",
+  padding: "10px 12px",
+  border: "1px solid #ccc",
+  borderRadius: 10,
+  fontSize: 14,
+  boxSizing: "border-box"
 };
 
 const tdStyle = {
-padding: "12px 10px",
-borderBottom: "1px solid #eee",
-verticalAlign: "top"
+  padding: "12px 10px",
+  borderBottom: "1px solid #eee",
+  verticalAlign: "top"
+};
+
+const cardStyle = {
+  border: "1px solid #e5e5e5",
+  borderRadius: 16,
+  background: "#fff",
+  padding: 20,
+  alignSelf: "start"
+};
+
+const infoBoxStyle = {
+  marginTop: 18,
+  padding: 12,
+  borderRadius: 12,
+  background: "#fafafa",
+  border: "1px solid #eee",
+  fontSize: 13,
+  color: "#555",
+  lineHeight: 1.5
+};
+
+const successBoxStyle = {
+  marginBottom: 16,
+  padding: 12,
+  borderRadius: 10,
+  border: "1px solid #cce5cc",
+  background: "#f3fff3",
+  color: "#2e6b2e"
+};
+
+const errorBoxStyle = {
+  marginBottom: 16,
+  padding: 12,
+  borderRadius: 10,
+  border: "1px solid #f1b5b5",
+  background: "#fff5f5",
+  color: "#9b1c1c"
+};
+
+const statsGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 10
+};
+
+const buttonPrimaryStyle = {
+  padding: "12px 14px",
+  borderRadius: 10,
+  border: "1px solid #2563eb",
+  background: "#2563eb",
+  color: "#fff",
+  cursor: "pointer",
+  fontSize: 14
+};
+
+const buttonDarkStyle = {
+  padding: "12px 14px",
+  borderRadius: 10,
+  border: "1px solid #111",
+  background: "#111",
+  color: "#fff",
+  cursor: "pointer",
+  fontSize: 14
 };
