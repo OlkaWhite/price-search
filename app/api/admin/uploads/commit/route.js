@@ -1,5 +1,12 @@
 import { supabaseAdmin } from "../../../../../lib/supabaseAdmin";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 300;
+
+const DELETE_CHUNK = 1000;
+const INSERT_CHUNK = 500;
+const READ_CHUNK = 1000;
+
 export async function POST(req) {
   try {
     const body = await req.json();
@@ -11,22 +18,134 @@ export async function POST(req) {
       return Response.json({ error: "Не выбран поставщик." }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin.rpc("commit_offers_import", {
-      p_pricelist_id: supplierId
-    });
+    const { count: rowsTotal, error: totalError } = await supabaseAdmin
+      .from("offers_import")
+      .select("*", { count: "exact", head: true });
 
-    if (error) {
+    if (totalError) {
       return Response.json(
-        { error: `Ошибка финальной загрузки: ${error.message}` },
+        { error: `Не удалось посчитать строки offers_import: ${totalError.message}` },
         { status: 500 }
       );
     }
 
-    const result = Array.isArray(data) ? data[0] : data;
+    const { data: skippedRowsData, error: skippedError } = await supabaseAdmin
+      .from("offers_import")
+      .select("pn");
 
-    const rowsTotal = result?.rows_total ?? 0;
-    const rowsInserted = result?.rows_inserted ?? 0;
-    const rowsSkipped = result?.rows_skipped ?? 0;
+    if (skippedError) {
+      return Response.json(
+        { error: `Не удалось посчитать пропущенные строки: ${skippedError.message}` },
+        { status: 500 }
+      );
+    }
+
+    const rowsSkipped = (skippedRowsData || []).filter(
+      (row) => !row.pn || String(row.pn).trim() === ""
+    ).length;
+
+    while (true) {
+      const { data: oldRows, error: oldRowsError } = await supabaseAdmin
+        .from("offers")
+        .select("id")
+        .eq("pricelist_id", supplierId)
+        .limit(DELETE_CHUNK);
+
+      if (oldRowsError) {
+        return Response.json(
+          { error: `Ошибка чтения старых строк offers: ${oldRowsError.message}` },
+          { status: 500 }
+        );
+      }
+
+      if (!oldRows || oldRows.length === 0) {
+        break;
+      }
+
+      const ids = oldRows.map((row) => row.id).filter(Boolean);
+
+      const { error: deleteError } = await supabaseAdmin
+        .from("offers")
+        .delete()
+        .in("id", ids);
+
+      if (deleteError) {
+        return Response.json(
+          { error: `Ошибка удаления старого прайса: ${deleteError.message}` },
+          { status: 500 }
+        );
+      }
+    }
+
+    let offset = 0;
+    let rowsInserted = 0;
+
+    while (true) {
+      const { data: importRows, error: importError } = await supabaseAdmin
+        .from("offers_import")
+        .select("brand, pn, name, qty, price_rub, price_usd")
+        .order("pn", { ascending: true })
+        .range(offset, offset + READ_CHUNK - 1);
+
+      if (importError) {
+        return Response.json(
+          { error: `Ошибка чтения offers_import: ${importError.message}` },
+          { status: 500 }
+        );
+      }
+
+      if (!importRows || importRows.length === 0) {
+        break;
+      }
+
+      const normalizedRows = importRows
+        .filter((row) => row.pn && String(row.pn).trim() !== "")
+        .map((row) => ({
+          pricelist_id: supplierId,
+          brand: String(row.brand ?? "").trim() || String(row.pn ?? "").trim(),
+          pn: String(row.pn ?? "").trim(),
+          name: String(row.name ?? "").trim() || String(row.pn ?? "").trim(),
+          qty: String(row.qty ?? "").trim() || null,
+          price_rub: normalizeNumeric(row.price_rub),
+          price_usd: normalizeNumeric(row.price_usd),
+          created_at: new Date().toISOString(),
+          uploaded_at: new Date().toISOString()
+        }));
+
+      for (let i = 0; i < normalizedRows.length; i += INSERT_CHUNK) {
+        const chunk = normalizedRows.slice(i, i + INSERT_CHUNK);
+
+        const { error: insertError } = await supabaseAdmin
+          .from("offers")
+          .insert(chunk);
+
+        if (insertError) {
+          return Response.json(
+            { error: `Ошибка вставки в offers: ${insertError.message}` },
+            { status: 500 }
+          );
+        }
+
+        rowsInserted += chunk.length;
+      }
+
+      offset += READ_CHUNK;
+    }
+
+    const { error: pricelistError } = await supabaseAdmin
+      .from("pricelists")
+      .update({
+        last_upload_at: new Date().toISOString(),
+        price_type: priceType
+      })
+      .eq("id", supplierId);
+
+    if (pricelistError) {
+      return Response.json(
+        { error: `Прайс загружен, но не обновился pricelists: ${pricelistError.message}` },
+        { status: 500 }
+      );
+    }
 
     const { error: logError } = await supabaseAdmin
       .from("price_upload_logs")
@@ -35,9 +154,9 @@ export async function POST(req) {
         uploaded_by: null,
         file_name: fileName || null,
         price_type: priceType || null,
-        rows_total: rowsTotal,
+        rows_total: rowsTotal ?? 0,
         rows_inserted: rowsInserted,
-        rows_skipped: rowsSkipped,
+        rows_skipped: rowsSkipped ?? 0,
         status: "ok",
         error_text:
           rowsSkipped > 0
@@ -55,9 +174,9 @@ export async function POST(req) {
     return Response.json({
       ok: true,
       stats: {
-        rowsTotal,
+        rowsTotal: rowsTotal ?? 0,
         rowsInserted,
-        rowsSkipped
+        rowsSkipped: rowsSkipped ?? 0
       }
     });
   } catch (error) {
@@ -66,4 +185,11 @@ export async function POST(req) {
       { status: 500 }
     );
   }
+}
+
+function normalizeNumeric(value) {
+  const s = String(value ?? "").trim();
+  if (!s) return null;
+  const normalized = s.replace(",", ".");
+  return normalized === "" ? null : normalized;
 }
