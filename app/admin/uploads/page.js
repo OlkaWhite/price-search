@@ -811,18 +811,31 @@ function buildAliasMap(aliases) {
   return map;
 }
 
+function normalizeHeaderName(value) {
+  return String(value ?? "")
+    .replace(/\u00A0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
 function findColumnName(sourceRows, explicitName, aliasList = []) {
   const firstRow = sourceRows?.[0] || {};
   const availableHeaders = Object.keys(firstRow);
 
-  if (explicitName && availableHeaders.includes(explicitName)) {
-    return explicitName;
+  const normalizedMap = new Map();
+  for (const header of availableHeaders) {
+    normalizedMap.set(normalizeHeaderName(header), header);
+  }
+
+  if (explicitName) {
+    const found = normalizedMap.get(normalizeHeaderName(explicitName));
+    if (found) return found;
   }
 
   for (const alias of aliasList) {
-    if (availableHeaders.includes(alias)) {
-      return alias;
-    }
+    const found = normalizedMap.get(normalizeHeaderName(alias));
+    if (found) return found;
   }
 
   return null;
