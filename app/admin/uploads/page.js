@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Papa from "papaparse";
 import { supabase } from "../../../lib/supabaseClient";
+
+const LARGE_FILE_LIMIT_MB = 8;
+const BIG_UPLOAD_CHUNK = 500;
 
 export default function AdminUploadsPage() {
   const [suppliers, setSuppliers] = useState([]);
@@ -17,6 +21,7 @@ export default function AdminUploadsPage() {
 
   const [previewLoading, setPreviewLoading] = useState(false);
   const [commitLoading, setCommitLoading] = useState(false);
+  const [bigUploadLoading, setBigUploadLoading] = useState(false);
 
   const [previewStats, setPreviewStats] = useState(null);
   const [previewRows, setPreviewRows] = useState([]);
@@ -82,6 +87,19 @@ export default function AdminUploadsPage() {
     return Object.fromEntries(suppliers.map((item) => [String(item.id), item]));
   }, [suppliers]);
 
+  const isLargeFile = file ? file.size > LARGE_FILE_LIMIT_MB * 1024 * 1024 : false;
+
+  function resetPreviewState() {
+    setPreviewStats(null);
+    setPreviewRows([]);
+    setPreviewReady(false);
+  }
+
+  function resetAllMessages() {
+    setMessage("");
+    setErrorText("");
+  }
+
   function handleSupplierChange(value) {
     setSupplierId(value);
     const supplier = suppliersMap[value];
@@ -89,11 +107,8 @@ export default function AdminUploadsPage() {
       setPriceType(supplier.price_type);
     }
 
-    setPreviewStats(null);
-    setPreviewRows([]);
-    setPreviewReady(false);
-    setMessage("");
-    setErrorText("");
+    resetPreviewState();
+    resetAllMessages();
   }
 
   async function handlePreview() {
@@ -107,12 +122,16 @@ export default function AdminUploadsPage() {
       return;
     }
 
+    if (isLargeFile) {
+      setErrorText(
+        "Файл слишком большой для обычной проверки. Используй кнопку «Загрузить большой файл без preview»."
+      );
+      return;
+    }
+
     setPreviewLoading(true);
-    setErrorText("");
-    setMessage("");
-    setPreviewReady(false);
-    setPreviewStats(null);
-    setPreviewRows([]);
+    resetAllMessages();
+    resetPreviewState();
 
     try {
       const formData = new FormData();
@@ -125,7 +144,14 @@ export default function AdminUploadsPage() {
         body: formData
       });
 
-      const data = await res.json();
+      const rawText = await res.text();
+
+      let data = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        throw new Error(rawText || "Сервер вернул невалидный ответ.");
+      }
 
       if (!res.ok) {
         throw new Error(data?.error || "Не удалось проверить файл.");
@@ -155,8 +181,7 @@ export default function AdminUploadsPage() {
     }
 
     setCommitLoading(true);
-    setErrorText("");
-    setMessage("");
+    resetAllMessages();
 
     try {
       const res = await fetch("/api/admin/uploads/commit", {
@@ -171,7 +196,14 @@ export default function AdminUploadsPage() {
         })
       });
 
-      const data = await res.json();
+      const rawText = await res.text();
+
+      let data = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        throw new Error(rawText || "Сервер вернул невалидный ответ.");
+      }
 
       if (!res.ok) {
         throw new Error(data?.error || "Не удалось загрузить прайс.");
@@ -183,14 +215,10 @@ export default function AdminUploadsPage() {
 
       setFile(null);
       setFileName("");
-      setPreviewStats(null);
-      setPreviewRows([]);
-      setPreviewReady(false);
+      resetPreviewState();
 
       const input = document.getElementById("csv-upload-input");
-      if (input) {
-        input.value = "";
-      }
+      if (input) input.value = "";
 
       await loadPageData();
     } catch (err) {
@@ -198,6 +226,162 @@ export default function AdminUploadsPage() {
       setErrorText(err?.message || "Ошибка загрузки прайса.");
     } finally {
       setCommitLoading(false);
+    }
+  }
+
+  async function handleBigUploadWithoutPreview() {
+    if (!supplierId) {
+      setErrorText("Выбери поставщика.");
+      return;
+    }
+
+    if (!file) {
+      setErrorText("Выбери CSV-файл.");
+      return;
+    }
+
+    setBigUploadLoading(true);
+    resetAllMessages();
+    resetPreviewState();
+
+    try {
+      setMessage("Читаю большой CSV-файл...");
+
+      const parsedRows = await parseCsvFile(file);
+
+      if (!parsedRows.length) {
+        throw new Error("CSV пустой или не удалось прочитать строки.");
+      }
+
+      const normalizedRows = parsedRows.map((row) => ({
+        brand: String(row.brand ?? "").trim(),
+        pn: String(row.pn ?? "").trim(),
+        name: String(row.name ?? "").trim(),
+        qty: String(row.qty ?? "").trim(),
+        price_rub: String(row.price_rub ?? "").trim(),
+        price_usd: String(row.price_usd ?? "").trim()
+      }));
+
+      const rowsTotal = normalizedRows.length;
+      const rowsWithoutPn = normalizedRows.filter((r) => !r.pn).length;
+      const rowsEmptyBrand = normalizedRows.filter((r) => !r.brand).length;
+      const rowsEmptyName = normalizedRows.filter((r) => !r.name).length;
+      const rowsReady = rowsTotal - rowsWithoutPn;
+
+      setPreviewStats({
+        rowsTotal,
+        rowsWithoutPn,
+        rowsEmptyBrand,
+        rowsEmptyName,
+        rowsReady
+      });
+      setPreviewRows(normalizedRows.slice(0, 20));
+
+      setMessage("Очищаю временную таблицу...");
+
+      const clearRes = await fetch("/api/admin/uploads/append", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "reset"
+        })
+      });
+
+      const clearRaw = await clearRes.text();
+      let clearData = null;
+      try {
+        clearData = clearRaw ? JSON.parse(clearRaw) : null;
+      } catch {
+        throw new Error(clearRaw || "Сервер вернул невалидный ответ при очистке.");
+      }
+
+      if (!clearRes.ok) {
+        throw new Error(clearData?.error || "Не удалось очистить временную таблицу.");
+      }
+
+      let uploaded = 0;
+
+      for (let i = 0; i < normalizedRows.length; i += BIG_UPLOAD_CHUNK) {
+        const chunk = normalizedRows.slice(i, i + BIG_UPLOAD_CHUNK);
+
+        setMessage(
+          `Загружаю большой файл во временную таблицу: ${Math.min(
+            i + chunk.length,
+            normalizedRows.length
+          )} / ${normalizedRows.length}`
+        );
+
+        const appendRes = await fetch("/api/admin/uploads/append", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            action: "append",
+            rows: chunk
+          })
+        });
+
+        const appendRaw = await appendRes.text();
+        let appendData = null;
+        try {
+          appendData = appendRaw ? JSON.parse(appendRaw) : null;
+        } catch {
+          throw new Error(appendRaw || "Сервер вернул невалидный ответ при дозагрузке.");
+        }
+
+        if (!appendRes.ok) {
+          throw new Error(appendData?.error || "Не удалось загрузить часть файла.");
+        }
+
+        uploaded += chunk.length;
+      }
+
+      setMessage(`Файл загружен во временную таблицу (${uploaded} строк). Переношу в offers...`);
+
+      const commitRes = await fetch("/api/admin/uploads/commit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          supplierId,
+          fileName,
+          priceType
+        })
+      });
+
+      const commitRaw = await commitRes.text();
+      let commitData = null;
+      try {
+        commitData = commitRaw ? JSON.parse(commitRaw) : null;
+      } catch {
+        throw new Error(commitRaw || "Сервер вернул невалидный ответ на финальной загрузке.");
+      }
+
+      if (!commitRes.ok) {
+        throw new Error(commitData?.error || "Не удалось загрузить прайс.");
+      }
+
+      setMessage(
+        `Большой прайс успешно загружен. Вставлено: ${commitData.stats.rowsInserted}, пропущено: ${commitData.stats.rowsSkipped}.`
+      );
+
+      setPreviewReady(false);
+      setFile(null);
+      setFileName("");
+
+      const input = document.getElementById("csv-upload-input");
+      if (input) input.value = "";
+
+      await loadPageData();
+    } catch (err) {
+      console.error("Big upload error:", err);
+      setErrorText(err?.message || "Ошибка загрузки большого прайса.");
+    } finally {
+      setBigUploadLoading(false);
     }
   }
 
@@ -210,17 +394,9 @@ export default function AdminUploadsPage() {
         </p>
       </div>
 
-      {message && (
-        <div style={successBoxStyle}>
-          {message}
-        </div>
-      )}
+      {message && <div style={successBoxStyle}>{message}</div>}
 
-      {errorText && (
-        <div style={errorBoxStyle}>
-          {errorText}
-        </div>
-      )}
+      {errorText && <div style={errorBoxStyle}>{errorText}</div>}
 
       {loading ? (
         <div>Загружаю страницу...</div>
@@ -270,19 +446,30 @@ export default function AdminUploadsPage() {
                     const nextFile = e.target.files?.[0] || null;
                     setFile(nextFile);
                     setFileName(nextFile?.name || "");
-                    setPreviewStats(null);
-                    setPreviewRows([]);
-                    setPreviewReady(false);
-                    setMessage("");
-                    setErrorText("");
+                    resetPreviewState();
+                    resetAllMessages();
                   }}
                   style={inputStyle}
                 />
               </Field>
 
               {fileName && (
-                <div style={{ fontSize: 13, color: "#555" }}>
+                <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>
                   Выбран файл: <b>{fileName}</b>
+                  {file?.size ? (
+                    <>
+                      <br />
+                      Размер: <b>{formatFileSize(file.size)}</b>
+                    </>
+                  ) : null}
+                  {isLargeFile ? (
+                    <>
+                      <br />
+                      <span style={{ color: "#c2410c", fontWeight: 600 }}>
+                        Большой файл — используй режим без preview.
+                      </span>
+                    </>
+                  ) : null}
                 </div>
               )}
 
@@ -290,10 +477,10 @@ export default function AdminUploadsPage() {
                 <button
                   type="button"
                   onClick={handlePreview}
-                  disabled={previewLoading || commitLoading}
+                  disabled={previewLoading || commitLoading || bigUploadLoading}
                   style={{
                     ...buttonPrimaryStyle,
-                    opacity: previewLoading || commitLoading ? 0.7 : 1
+                    opacity: previewLoading || commitLoading || bigUploadLoading ? 0.7 : 1
                   }}
                 >
                   {previewLoading ? "Проверяю..." : "Проверить файл"}
@@ -302,19 +489,36 @@ export default function AdminUploadsPage() {
                 <button
                   type="button"
                   onClick={handleCommit}
-                  disabled={!previewReady || previewLoading || commitLoading}
+                  disabled={!previewReady || previewLoading || commitLoading || bigUploadLoading}
                   style={{
                     ...buttonDarkStyle,
-                    opacity: !previewReady || previewLoading || commitLoading ? 0.6 : 1
+                    opacity:
+                      !previewReady || previewLoading || commitLoading || bigUploadLoading
+                        ? 0.6
+                        : 1
                   }}
                 >
                   {commitLoading ? "Загружаю..." : "Загрузить прайс"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleBigUploadWithoutPreview}
+                  disabled={!file || previewLoading || commitLoading || bigUploadLoading}
+                  style={{
+                    ...buttonWarnStyle,
+                    opacity: !file || previewLoading || commitLoading || bigUploadLoading ? 0.6 : 1
+                  }}
+                >
+                  {bigUploadLoading
+                    ? "Гружу большой файл..."
+                    : "Загрузить большой файл без preview"}
                 </button>
               </div>
             </div>
 
             <div style={infoBoxStyle}>
-              Процесс работы:
+              Обычный режим:
               <br />
               1. Выбираешь поставщика
               <br />
@@ -325,11 +529,16 @@ export default function AdminUploadsPage() {
               4. Смотришь превью и статистику
               <br />
               5. Нажимаешь <b>Загрузить прайс</b>
+              <br />
+              <br />
+              Для больших файлов:
+              <br />
+              используй кнопку <b>«Загрузить большой файл без preview»</b>
             </div>
 
             {previewStats && (
               <div style={{ marginTop: 18 }}>
-                <h3 style={{ marginBottom: 10 }}>Статистика проверки</h3>
+                <h3 style={{ marginBottom: 10 }}>Статистика</h3>
 
                 <div style={statsGridStyle}>
                   <StatCard label="Всего строк" value={previewStats.rowsTotal} />
@@ -470,6 +679,33 @@ export default function AdminUploadsPage() {
   );
 }
 
+function parseCsvFile(file) {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      worker: true,
+      complete: (results) => {
+        if (results.errors?.length) {
+          reject(new Error(results.errors[0].message || "Ошибка чтения CSV."));
+          return;
+        }
+        resolve(results.data || []);
+      },
+      error: (error) => {
+        reject(error);
+      }
+    });
+  });
+}
+
+function formatFileSize(bytes) {
+  if (!bytes && bytes !== 0) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 function Field({ label, children }) {
   return (
     <div>
@@ -602,4 +838,15 @@ const buttonDarkStyle = {
   color: "#fff",
   cursor: "pointer",
   fontSize: 14
+};
+
+const buttonWarnStyle = {
+  padding: "12px 14px",
+  borderRadius: 10,
+  border: "1px solid #c2410c",
+  background: "#fff7ed",
+  color: "#9a3412",
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 600
 };
