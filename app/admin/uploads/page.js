@@ -870,10 +870,10 @@ function normalizeRowsByRule(sourceRows, rule, aliases) {
         brand = brandColumn ? cleanValue(row[brandColumn], rule.trim_values) : "";
       }
 
-     const qty =
-  rule.qty_mode === "fixed"
-    ? cleanValue(rule.qty_fixed, true)
-    : normalizeQtyValue(rawQty, rule);
+      const qty =
+        rule.qty_mode === "fixed"
+          ? cleanValue(rule.qty_fixed, true)
+          : normalizeQtyValue(rawQty, rule);
 
       const priceValue = normalizePriceValue(
         row[priceColumn],
@@ -897,6 +897,15 @@ function normalizeRowsByRule(sourceRows, rule, aliases) {
 
       if (rule.skip_empty_qty && !String(row.qty || "").trim()) {
         return false;
+      }
+
+      if (rule.skip_empty_price) {
+        const priceValue =
+          rule.price_currency === "rub" ? row.price_rub : row.price_usd;
+
+        if (!String(priceValue || "").trim()) {
+          return false;
+        }
       }
 
       const qtyLower = String(row.qty || "").trim().toLowerCase();
