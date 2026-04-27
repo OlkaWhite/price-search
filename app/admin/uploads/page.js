@@ -445,7 +445,7 @@ export default function AdminUploadsPage() {
                 <input
                   id="csv-upload-input"
                   type="file"
-                  accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  accept=".csv,.xls,.xlsx,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   onChange={(e) => {
                     const nextFile = e.target.files?.[0] || null;
                     setFile(nextFile);
@@ -736,7 +736,7 @@ async function parseSourceFile(file, rule) {
     return await parseCsvFile(file);
   }
 
-  if (ext === "xlsx" || ext === "xls") {
+  if (ext === "xlsx" || ext === "xls" || ext === "xlsm") {
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: "array" });
 
@@ -759,7 +759,7 @@ async function parseSourceFile(file, rule) {
     return matrixToObjects(matrix, rule);
   }
 
-  throw new Error("Поддерживаются только csv, xls, xlsx.");
+  throw new Error("Поддерживаются только csv, xls, xlsx, xlsm.");
 }
 
 function matrixToObjects(matrix, rule) {
