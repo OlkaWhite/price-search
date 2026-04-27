@@ -10,6 +10,7 @@ export default function AdminSuppliersPage() {
   const [saving, setSaving] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [message, setMessage] = useState("");
+  const [deletingPrice, setDeletingPrice] = useState(false);
 
   async function loadSuppliers() {
     setLoading(true);
@@ -125,6 +126,60 @@ export default function AdminSuppliersPage() {
 
     setSaving(false);
   }
+
+  async function handleDeletePrice() {
+  if (!selectedSupplier) return;
+
+  const confirmText = `Удалить текущий прайс поставщика #${selectedSupplier.id} — ${selectedSupplier.supplier || "—"} / ${selectedSupplier.name || "—"}?`;
+  const confirmed = window.confirm(confirmText);
+
+  if (!confirmed) return;
+
+  setDeletingPrice(true);
+  setErrorText("");
+  setMessage("");
+
+  try {
+    const res = await fetch("/api/admin/suppliers/delete-price", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        supplierId: selectedSupplier.id
+      })
+    });
+
+    const rawText = await res.text();
+
+    let data = null;
+    try {
+      data = rawText ? JSON.parse(rawText) : null;
+    } catch {
+      throw new Error(rawText || "Сервер вернул невалидный ответ.");
+    }
+
+    if (!res.ok) {
+      throw new Error(data?.error || "Не удалось удалить прайс.");
+    }
+
+    setMessage(
+      `Прайс поставщика удалён. Удалено строк: ${data?.deletedRows ?? 0}.`
+    );
+
+    if (data?.warning) {
+      setErrorText(data.warning);
+    }
+
+    await loadSuppliers();
+  } catch (err) {
+    console.error("Delete supplier price error:", err);
+    setErrorText(err?.message || "Не удалось удалить прайс поставщика.");
+  } finally {
+    setDeletingPrice(false);
+  }
+}
+
 
   function updateField(field, value) {
     setSelectedSupplier((prev) => ({
@@ -396,23 +451,47 @@ export default function AdminSuppliersPage() {
               </Field>
             </div>
 
-            <div style={{ marginTop: 20 }}>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: 10,
-                  border: "1px solid #111",
-                  background: saving ? "#ddd" : "#111",
-                  color: saving ? "#333" : "#fff",
-                  cursor: saving ? "default" : "pointer",
-                  fontSize: 14
-                }}
-              >
-                {saving ? "Сохраняю..." : "Сохранить"}
-              </button>
-            </div>
+            <div
+  style={{
+    marginTop: 20,
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap"
+  }}
+>
+  <button
+    onClick={handleSave}
+    disabled={saving || deletingPrice}
+    style={{
+      padding: "12px 14px",
+      borderRadius: 10,
+      border: "1px solid #111",
+      background: saving || deletingPrice ? "#ddd" : "#111",
+      color: saving || deletingPrice ? "#333" : "#fff",
+      cursor: saving || deletingPrice ? "default" : "pointer",
+      fontSize: 14
+    }}
+  >
+    {saving ? "Сохраняю..." : "Сохранить"}
+  </button>
+
+  <button
+    onClick={handleDeletePrice}
+    disabled={saving || deletingPrice}
+    style={{
+      padding: "12px 14px",
+      borderRadius: 10,
+      border: "1px solid #b91c1c",
+      background: deletingPrice ? "#f3f4f6" : "#fff",
+      color: "#b91c1c",
+      cursor: saving || deletingPrice ? "default" : "pointer",
+      fontSize: 14,
+      fontWeight: 600
+    }}
+  >
+    {deletingPrice ? "Удаляю прайс..." : "Удалить текущий прайс"}
+  </button>
+</div>
           </div>
         )}
       </div>
