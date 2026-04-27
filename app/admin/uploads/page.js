@@ -892,6 +892,16 @@ function findColumnName(sourceRows, explicitName, aliasList = []) {
   return null;
 }
 
+function resolveColumnKey(sourceRows, explicitName, aliasList = [], columnIndex = null) {
+  const indexNumber = Number(columnIndex);
+
+  if (Number.isFinite(indexNumber) && indexNumber > 0) {
+    return `__col_${indexNumber}`;
+  }
+
+  return findColumnName(sourceRows, explicitName, aliasList);
+}
+
 function normalizeRowsByRule(sourceRows, rule, aliases) {
   if (!Array.isArray(sourceRows) || sourceRows.length === 0) {
     return [];
