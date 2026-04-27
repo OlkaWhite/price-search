@@ -870,10 +870,10 @@ function normalizeRowsByRule(sourceRows, rule, aliases) {
         brand = brandColumn ? cleanValue(row[brandColumn], rule.trim_values) : "";
       }
 
-      const qty =
-        rule.qty_mode === "fixed"
-          ? cleanValue(rule.qty_fixed, true)
-          : normalizeQtyValue(rawQty);
+     const qty =
+  rule.qty_mode === "fixed"
+    ? cleanValue(rule.qty_fixed, true)
+    : normalizeQtyValue(rawQty, rule);
 
       const priceValue = normalizePriceValue(
         row[priceColumn],
@@ -913,8 +913,8 @@ function cleanValue(value, trim = true) {
   return trim ? s.trim() : s;
 }
 
-function normalizeQtyValue(value) {
-  const s = String(value ?? "").trim();
+function normalizeQtyValue(value, rule = {}) {
+  let s = String(value ?? "").trim();
 
   if (!s) return "";
 
@@ -922,6 +922,16 @@ function normalizeQtyValue(value) {
   const moreMatch = s.match(/^больше\s+(.+)$/i);
   if (moreMatch) {
     return `>${String(moreMatch[1] || "").trim()}`;
+  }
+
+  // 6,00 -> 6  (только если включено в правиле)
+  if (rule.qty_trim_zero_decimals) {
+    const normalized = s.replace(",", ".");
+    const num = Number(normalized);
+
+    if (!Number.isNaN(num) && Number.isInteger(num)) {
+      return String(num);
+    }
   }
 
   return s;
