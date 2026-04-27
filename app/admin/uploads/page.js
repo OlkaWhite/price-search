@@ -909,29 +909,62 @@ function normalizeRowsByRule(sourceRows, rule, aliases) {
 
   const aliasMap = buildAliasMap(aliases);
 
-  const pnColumn = findColumnName(sourceRows, rule.pn_column, aliasMap.pn);
-  const nameColumn = findColumnName(sourceRows, rule.name_column, aliasMap.name);
-  const qtyColumn = findColumnName(sourceRows, rule.qty_column, aliasMap.qty);
-  const brandColumn = findColumnName(sourceRows, rule.brand_column, aliasMap.brand);
-  const priceColumn = findColumnName(sourceRows, rule.price_column, aliasMap.price);
+  const pnKey = resolveColumnKey(
+    sourceRows,
+    rule.pn_column,
+    aliasMap.pn,
+    rule.pn_column_index
+  );
+  const nameKey = resolveColumnKey(
+    sourceRows,
+    rule.name_column,
+    aliasMap.name,
+    rule.name_column_index
+  );
+  const qtyKey = resolveColumnKey(
+    sourceRows,
+    rule.qty_column,
+    aliasMap.qty,
+    rule.qty_column_index
+  );
+  const brandKey = resolveColumnKey(
+    sourceRows,
+    rule.brand_column,
+    aliasMap.brand,
+    rule.brand_column_index
+  );
+
+  const priceUsdKey = resolveColumnKey(
+    sourceRows,
+    rule.price_usd_column || (rule.price_currency === "usd" ? rule.price_column : null),
+    [],
+    null
+  );
+
+  const priceRubKey = resolveColumnKey(
+    sourceRows,
+    rule.price_rub_column || (rule.price_currency === "rub" ? rule.price_column : null),
+    [],
+    null
+  );
 
   const availableHeaders = Object.keys(sourceRows?.[0] || {});
 
-  if (!pnColumn) {
+  if (!pnKey) {
     throw new Error(
-      `Не найдена колонка артикула (pn). Ищу: "${rule.pn_column}". Доступные заголовки: ${availableHeaders.join(" | ")}`
+      `Не найдена колонка артикула (pn). Ищу: "${rule.pn_column || ""}". Доступные заголовки: ${availableHeaders.join(" | ")}`
     );
   }
 
-  if (!nameColumn) {
+  if (!nameKey) {
     throw new Error(
-      `Не найдена колонка наименования (name). Ищу: "${rule.name_column}". Доступные заголовки: ${availableHeaders.join(" | ")}`
+      `Не найдена колонка наименования (name). Ищу: "${rule.name_column || ""}". Доступные заголовки: ${availableHeaders.join(" | ")}`
     );
   }
 
-  if (!priceColumn) {
+  if (!priceUsdKey && !priceRubKey) {
     throw new Error(
-      `Не найдена колонка цены (price). Ищу: "${rule.price_column}". Доступные заголовки: ${availableHeaders.join(" | ")}`
+      `Не найдены колонки цены. Ищу USD: "${rule.price_usd_column || ""}", RUB: "${rule.price_rub_column || ""}". Доступные заголовки: ${availableHeaders.join(" | ")}`
     );
   }
 
@@ -941,15 +974,15 @@ function normalizeRowsByRule(sourceRows, rule, aliases) {
 
   return sourceRows
     .map((row) => {
-      const pn = cleanValue(row[pnColumn], rule.trim_values);
-      const name = cleanValue(row[nameColumn], rule.trim_values);
-      const rawQty = qtyColumn ? cleanValue(row[qtyColumn], rule.trim_values) : "";
+      const pn = cleanValue(row[pnKey], rule.trim_values);
+      const name = cleanValue(row[nameKey], rule.trim_values);
+      const rawQty = qtyKey ? cleanValue(row[qtyKey], rule.trim_values) : "";
 
       let brand = "";
       if (rule.brand_mode === "fixed") {
         brand = cleanValue(rule.brand_fixed, true);
       } else if (rule.brand_mode === "column") {
-        brand = brandColumn ? cleanValue(row[brandColumn], rule.trim_values) : "";
+        brand = brandKey ? cleanValue(row[brandKey], rule.trim_values) : "";
       }
 
       const qty =
@@ -957,19 +990,21 @@ function normalizeRowsByRule(sourceRows, rule, aliases) {
           ? cleanValue(rule.qty_fixed, true)
           : normalizeQtyValue(rawQty, rule);
 
-      const priceValue = normalizePriceValue(
-        row[priceColumn],
-        rule.trim_values,
-        rule.replace_comma_in_price
-      );
+      const priceUsd = priceUsdKey
+        ? normalizePriceValue(row[priceUsdKey], rule.trim_values, rule.replace_comma_in_price)
+        : "";
+
+      const priceRub = priceRubKey
+        ? normalizePriceValue(row[priceRubKey], rule.trim_values, rule.replace_comma_in_price)
+        : "";
 
       return {
         brand,
         pn,
         name,
         qty,
-        price_rub: rule.price_currency === "rub" ? priceValue : "",
-        price_usd: rule.price_currency === "usd" ? priceValue : ""
+        price_rub: priceRub,
+        price_usd: priceUsd
       };
     })
     .filter((row) => {
@@ -982,10 +1017,10 @@ function normalizeRowsByRule(sourceRows, rule, aliases) {
       }
 
       if (rule.skip_empty_price) {
-        const priceValue =
-          rule.price_currency === "rub" ? row.price_rub : row.price_usd;
+        const hasRub = String(row.price_rub || "").trim();
+        const hasUsd = String(row.price_usd || "").trim();
 
-        if (!String(priceValue || "").trim()) {
+        if (!hasRub && !hasUsd) {
           return false;
         }
       }
