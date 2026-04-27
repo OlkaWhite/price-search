@@ -4,8 +4,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const DELETE_CHUNK = 300;
-const INSERT_CHUNK = 50;
-const READ_CHUNK = 200;
+const INSERT_CHUNK = 20;
+const READ_CHUNK = 100;
 
 export async function POST(req) {
   try {
@@ -118,7 +118,6 @@ export async function POST(req) {
       const { data: importRows, error: importError } = await supabaseAdmin
         .from("offers_import")
         .select("brand, pn, name, qty, price_rub, price_usd")
-        .order("pn", { ascending: true })
         .range(offset, offset + READ_CHUNK - 1);
 
       if (importError) {
@@ -151,25 +150,7 @@ export async function POST(req) {
           uploaded_at: new Date().toISOString()
         }));
 
-      let inserted = 0;
-
-      for (let i = 0; i < normalizedRows.length; i += INSERT_CHUNK) {
-        const chunk = normalizedRows.slice(i, i + INSERT_CHUNK);
-
-        const { error: insertError } = await supabaseAdmin
-          .from("offers")
-          .insert(chunk);
-
-        if (insertError) {
-          return Response.json(
-            { error: `Ошибка вставки в offers: ${insertError.message}` },
-            { status: 500 }
-          );
-        }
-
-        inserted += chunk.length;
-        await new Promise((resolve) => setTimeout(resolve, 80));
-      }
+      const inserted = await insertRowsWithFallback(normalizedRows);
 
       return Response.json({
         ok: true,
@@ -239,9 +220,67 @@ export async function POST(req) {
   }
 }
 
+async function insertRowsWithFallback(rows) {
+  if (!rows.length) return 0;
+
+  if (rows.length <= INSERT_CHUNK) {
+    return await tryInsertRecursive(rows);
+  }
+
+  let inserted = 0;
+
+  for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
+    const chunk = rows.slice(i, i + INSERT_CHUNK);
+    inserted += await tryInsertRecursive(chunk);
+    await sleep(120);
+  }
+
+  return inserted;
+}
+
+async function tryInsertRecursive(rows) {
+  if (!rows.length) return 0;
+
+  const { error } = await supabaseAdmin
+    .from("offers")
+    .insert(rows);
+
+  if (!error) {
+    return rows.length;
+  }
+
+  const message = String(error.message || "").toLowerCase();
+  const isTimeout =
+    message.includes("statement timeout") ||
+    message.includes("canceling statement due to statement timeout");
+
+  if (!isTimeout) {
+    throw new Error(`Ошибка вставки в offers: ${error.message}`);
+  }
+
+  if (rows.length === 1) {
+    throw new Error(`Ошибка вставки в offers: ${error.message}`);
+  }
+
+  const middle = Math.ceil(rows.length / 2);
+  const left = rows.slice(0, middle);
+  const right = rows.slice(middle);
+
+  let inserted = 0;
+  inserted += await tryInsertRecursive(left);
+  await sleep(120);
+  inserted += await tryInsertRecursive(right);
+
+  return inserted;
+}
+
 function normalizeNumeric(value) {
   const s = String(value ?? "").trim();
   if (!s) return null;
   const normalized = s.replace(",", ".");
   return normalized === "" ? null : normalized;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
