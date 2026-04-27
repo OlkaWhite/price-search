@@ -861,7 +861,7 @@ function normalizeRowsByRule(sourceRows, rule, aliases) {
     .map((row) => {
       const pn = cleanValue(row[pnColumn], rule.trim_values);
       const name = cleanValue(row[nameColumn], rule.trim_values);
-      const qty = qtyColumn ? cleanValue(row[qtyColumn], rule.trim_values) : "";
+      const rawQty = qtyColumn ? cleanValue(row[qtyColumn], rule.trim_values) : "";
 
       let brand = "";
       if (rule.brand_mode === "fixed") {
@@ -870,16 +870,22 @@ function normalizeRowsByRule(sourceRows, rule, aliases) {
         brand = brandColumn ? cleanValue(row[brandColumn], rule.trim_values) : "";
       }
 
-      let priceValue = cleanValue(row[priceColumn], rule.trim_values);
-      if (rule.replace_comma_in_price) {
-        priceValue = priceValue.replace(",", ".");
-      }
+      const qty =
+        rule.qty_mode === "fixed"
+          ? cleanValue(rule.qty_fixed, true)
+          : normalizeQtyValue(rawQty);
+
+      const priceValue = normalizePriceValue(
+        row[priceColumn],
+        rule.trim_values,
+        rule.replace_comma_in_price
+      );
 
       return {
         brand,
         pn,
         name,
-        qty: rule.qty_mode === "fixed" ? cleanValue(rule.qty_fixed, true) : qty,
+        qty,
         price_rub: rule.price_currency === "rub" ? priceValue : "",
         price_usd: rule.price_currency === "usd" ? priceValue : ""
       };
@@ -907,6 +913,38 @@ function cleanValue(value, trim = true) {
   return trim ? s.trim() : s;
 }
 
+function normalizeQtyValue(value) {
+  const s = String(value ?? "").trim();
+
+  if (!s) return "";
+
+  // Больше 30 -> >30
+  const moreMatch = s.match(/^больше\s+(.+)$/i);
+  if (moreMatch) {
+    return `>${String(moreMatch[1] || "").trim()}`;
+  }
+
+  return s;
+}
+
+function normalizePriceValue(value, trim = true, replaceComma = true) {
+  let s = String(value ?? "");
+
+  if (trim) {
+    s = s.trim();
+  }
+
+  if (!s) return "";
+
+  // убираем обычные и неразрывные пробелы
+  s = s.replace(/\s+/g, "").replace(/\u00A0/g, "");
+
+  if (replaceComma) {
+    s = s.replace(",", ".");
+  }
+
+  return s;
+}
 function getFileExtension(fileName = "") {
   const parts = String(fileName).toLowerCase().split(".");
   return parts.length > 1 ? parts.pop() : "";
