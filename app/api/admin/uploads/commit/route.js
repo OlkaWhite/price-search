@@ -3,9 +3,9 @@ import { supabaseAdmin } from "../../../../../lib/supabaseAdmin";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const DELETE_CHUNK = 1000;
-const INSERT_CHUNK = 500;
-const READ_CHUNK = 1000;
+const DELETE_CHUNK = 300;
+const INSERT_CHUNK = 50;
+const READ_CHUNK = 200;
 
 export async function POST(req) {
   try {
@@ -112,22 +112,33 @@ export async function POST(req) {
           uploaded_at: new Date().toISOString()
         }));
 
-      for (let i = 0; i < normalizedRows.length; i += INSERT_CHUNK) {
-        const chunk = normalizedRows.slice(i, i + INSERT_CHUNK);
+     for (let i = 0; i < normalizedRows.length; i += INSERT_CHUNK) {
+  const chunk = normalizedRows.slice(i, i + INSERT_CHUNK);
 
-        const { error: insertError } = await supabaseAdmin
-          .from("offers")
-          .insert(chunk);
+  const { error: insertError } = await supabaseAdmin
+    .from("offers")
+    .insert(chunk);
 
-        if (insertError) {
-          return Response.json(
-            { error: `Ошибка вставки в offers: ${insertError.message}` },
-            { status: 500 }
-          );
-        }
+  if (insertError) {
+    console.error("Insert chunk error:", insertError, {
+      supplierId,
+      chunkSize: chunk.length,
+      samplePn: chunk[0]?.pn || null
+    });
 
-        rowsInserted += chunk.length;
-      }
+    return Response.json(
+      {
+        error: `Ошибка вставки в offers: ${insertError.message}`,
+        details: insertError
+      },
+      { status: 500 }
+    );
+  }
+
+  rowsInserted += chunk.length;
+
+  await new Promise((resolve) => setTimeout(resolve, 80));
+}
 
       offset += READ_CHUNK;
     }
