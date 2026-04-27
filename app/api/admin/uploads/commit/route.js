@@ -3,9 +3,9 @@ import { supabaseAdmin } from "../../../../../lib/supabaseAdmin";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const DELETE_CHUNK = 300;
-const INSERT_CHUNK = 50;
-const READ_CHUNK = 200;
+const DELETE_CHUNK = 1000;
+const INSERT_CHUNK = 100;
+const READ_CHUNK = 500;
 
 export async function POST(req) {
   try {
@@ -84,7 +84,6 @@ export async function POST(req) {
       const { data: importRows, error: importError } = await supabaseAdmin
         .from("offers_import")
         .select("brand, pn, name, qty, price_rub, price_usd")
-        .order("pn", { ascending: true })
         .range(offset, offset + READ_CHUNK - 1);
 
       if (importError) {
@@ -120,24 +119,15 @@ export async function POST(req) {
           .insert(chunk);
 
         if (insertError) {
-          console.error("Insert chunk error:", insertError, {
-            supplierId,
-            chunkSize: chunk.length,
-            samplePn: chunk[0]?.pn || null
-          });
-
           return Response.json(
             {
-              error: `Ошибка вставки в offers: ${insertError.message}`,
-              details: insertError
+              error: `Ошибка вставки в offers: ${insertError.message}`
             },
             { status: 500 }
           );
         }
 
         rowsInserted += chunk.length;
-
-        await new Promise((resolve) => setTimeout(resolve, 80));
       }
 
       offset += READ_CHUNK;
