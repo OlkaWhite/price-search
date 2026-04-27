@@ -120,70 +120,78 @@ export default function AdminUploadsPage() {
   }
 
   async function handlePreview() {
-    if (!supplierId) {
-      setErrorText("Выбери поставщика.");
-      return;
-    }
-
-    if (!file) {
-      setErrorText("Выбери CSV/XLS/XLSX-файл.");
-      return;
-    }
-
-    if (isLargeFile) {
-      setErrorText(
-        "Файл слишком большой для обычной проверки. Используй кнопку «Загрузить большой файл без preview»."
-      );
-      return;
-    }
-
-    setPreviewLoading(true);
-    resetAllMessages();
-    resetPreviewState();
-
-    try {
-      const ruleData = await fetchImportRule(supplierId);
-      const sourceRows = await parseSourceFile(file, ruleData.rule);
-      const normalizedRows = normalizeRowsByRule(
-        sourceRows,
-        ruleData.rule,
-        ruleData.aliases
-      );
-
-      const rowsTotal = normalizedRows.length;
-      const rowsWithoutPn = normalizedRows.filter((r) => !r.pn).length;
-      const rowsEmptyBrand = normalizedRows.filter((r) => !r.brand).length;
-      const rowsEmptyName = normalizedRows.filter((r) => !r.name).length;
-      const rowsReady = rowsTotal - rowsWithoutPn;
-
-      setPreviewStats({
-        rowsTotal,
-        rowsWithoutPn,
-        rowsEmptyBrand,
-        rowsEmptyName,
-        rowsReady
-      });
-
-      setPreviewRows(normalizedRows.slice(0, 20));
-      setPreviewReady(true);
-      setMessage("Файл нормализован по правилу поставщика. Можно загружать прайс.");
-
-      await postJson("/api/admin/uploads/append", { action: "reset" });
-
-      for (let i = 0; i < normalizedRows.length; i += BIG_UPLOAD_CHUNK) {
-        const chunk = normalizedRows.slice(i, i + BIG_UPLOAD_CHUNK);
-        await postJson("/api/admin/uploads/append", {
-          action: "append",
-          rows: chunk
-        });
-      }
-    } catch (err) {
-      console.error("Preview error:", err);
-      setErrorText(err?.message || "Ошибка проверки файла.");
-    } finally {
-      setPreviewLoading(false);
-    }
+  if (!supplierId) {
+    setErrorText("Выбери поставщика.");
+    return;
   }
+
+  if (!file) {
+    setErrorText("Выбери CSV/XLS/XLSX-файл.");
+    return;
+  }
+
+  if (isLargeFile) {
+    setErrorText(
+      "Файл слишком большой для обычной проверки. Используй кнопку «Загрузить большой файл без preview»."
+    );
+    return;
+  }
+
+  setPreviewLoading(true);
+  resetAllMessages();
+  resetPreviewState();
+
+  try {
+    const ruleData = await fetchImportRule(supplierId);
+    const parsed = await parseSourceFile(file, ruleData.rule);
+    const sourceRows = parsed.rows;
+
+    console.log("IMPORT DEBUG", {
+      supplierId,
+      rule: ruleData.rule,
+      debug: parsed.debug
+    });
+
+    const normalizedRows = normalizeRowsByRule(
+      sourceRows,
+      ruleData.rule,
+      ruleData.aliases
+    );
+
+    const rowsTotal = normalizedRows.length;
+    const rowsWithoutPn = normalizedRows.filter((r) => !r.pn).length;
+    const rowsEmptyBrand = normalizedRows.filter((r) => !r.brand).length;
+    const rowsEmptyName = normalizedRows.filter((r) => !r.name).length;
+    const rowsReady = rowsTotal - rowsWithoutPn;
+
+    setPreviewStats({
+      rowsTotal,
+      rowsWithoutPn,
+      rowsEmptyBrand,
+      rowsEmptyName,
+      rowsReady
+    });
+
+    setPreviewRows(normalizedRows.slice(0, 20));
+    setPreviewReady(true);
+    setMessage("Файл нормализован по правилу поставщика. Можно загружать прайс.");
+
+    await postJson("/api/admin/uploads/append", { action: "reset" });
+
+    for (let i = 0; i < normalizedRows.length; i += BIG_UPLOAD_CHUNK) {
+      const chunk = normalizedRows.slice(i, i + BIG_UPLOAD_CHUNK);
+      await postJson("/api/admin/uploads/append", {
+        action: "append",
+        rows: chunk
+      });
+    }
+  } catch (err) {
+    console.error("Preview error:", err);
+    setErrorText(err?.message || "Ошибка проверки файла.");
+  } finally {
+    setPreviewLoading(false);
+  }
+}
 
   async function handleCommit() {
     if (!supplierId) {
@@ -733,7 +741,14 @@ async function parseSourceFile(file, rule) {
   const ext = getFileExtension(file.name);
 
   if (ext === "csv") {
-    return await parseCsvFile(file);
+    const rows = await parseCsvFile(file);
+    return {
+      rows,
+      debug: {
+        fileType: "csv",
+        normalizedHeaders: Object.keys(rows?.[0] || {})
+      }
+    };
   }
 
   if (ext === "xlsx" || ext === "xls" || ext === "xlsm") {
@@ -756,7 +771,19 @@ async function parseSourceFile(file, rule) {
       defval: ""
     });
 
-    return matrixToObjects(matrix, rule);
+    const parsed = matrixToObjects(matrix, rule);
+
+    return {
+      rows: parsed.rows,
+      debug: {
+        fileType: ext,
+        sheetName,
+        headerRowIndex: parsed.debug.headerRowIndex,
+        dataStartIndex: parsed.debug.dataStartIndex,
+        rawHeaderRow: parsed.debug.rawHeaderRow,
+        normalizedHeaders: parsed.debug.normalizedHeaders
+      }
+    };
   }
 
   throw new Error("Поддерживаются только csv, xls, xlsx, xlsm.");
@@ -766,9 +793,8 @@ function matrixToObjects(matrix, rule) {
   const headerRowIndex = Math.max(0, Number(rule.header_row || 1) - 1);
   const dataStartIndex = Math.max(0, Number(rule.data_start_row || 2) - 1);
 
-  const headers = (matrix[headerRowIndex] || []).map((cell) =>
-    String(cell ?? "").trim()
-  );
+  const rawHeaderRow = matrix[headerRowIndex] || [];
+  const headers = rawHeaderRow.map((cell) => String(cell ?? "").trim());
 
   if (!headers.length) {
     throw new Error("Не удалось прочитать строку заголовков из Excel.");
@@ -787,7 +813,15 @@ function matrixToObjects(matrix, rule) {
     rows.push(obj);
   }
 
-  return rows;
+  return {
+    rows,
+    debug: {
+      headerRowIndex: headerRowIndex + 1,
+      dataStartIndex: dataStartIndex + 1,
+      rawHeaderRow,
+      normalizedHeaders: headers
+    }
+  };
 }
 
 function buildAliasMap(aliases) {
@@ -854,16 +888,24 @@ function normalizeRowsByRule(sourceRows, rule, aliases) {
   const brandColumn = findColumnName(sourceRows, rule.brand_column, aliasMap.brand);
   const priceColumn = findColumnName(sourceRows, rule.price_column, aliasMap.price);
 
+  const availableHeaders = Object.keys(sourceRows?.[0] || {});
+
   if (!pnColumn) {
-    throw new Error("Не найдена колонка артикула (pn).");
+    throw new Error(
+      `Не найдена колонка артикула (pn). Ищу: "${rule.pn_column}". Доступные заголовки: ${availableHeaders.join(" | ")}`
+    );
   }
 
   if (!nameColumn) {
-    throw new Error("Не найдена колонка наименования (name).");
+    throw new Error(
+      `Не найдена колонка наименования (name). Ищу: "${rule.name_column}". Доступные заголовки: ${availableHeaders.join(" | ")}`
+    );
   }
 
   if (!priceColumn) {
-    throw new Error("Не найдена колонка цены (price).");
+    throw new Error(
+      `Не найдена колонка цены (price). Ищу: "${rule.price_column}". Доступные заголовки: ${availableHeaders.join(" | ")}`
+    );
   }
 
   const skipQtyValues = Array.isArray(rule.skip_qty_values)
