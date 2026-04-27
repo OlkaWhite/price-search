@@ -741,12 +741,18 @@ async function parseSourceFile(file, rule) {
   const ext = getFileExtension(file.name);
 
   if (ext === "csv") {
-    const rows = await parseCsvFile(file);
+    const matrix = await parseCsvFile(file);
+
+    const parsed = matrixToObjects(matrix, rule);
+
     return {
-      rows,
+      rows: parsed.rows,
       debug: {
         fileType: "csv",
-        normalizedHeaders: Object.keys(rows?.[0] || {})
+        headerRowIndex: parsed.debug.headerRowIndex,
+        dataStartIndex: parsed.debug.dataStartIndex,
+        rawHeaderRow: parsed.debug.rawHeaderRow,
+        normalizedHeaders: parsed.debug.normalizedHeaders
       }
     };
   }
@@ -1027,7 +1033,7 @@ function getFileExtension(fileName = "") {
 function parseCsvFile(file) {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
-      header: true,
+      header: false,
       skipEmptyLines: true,
       worker: true,
       complete: (results) => {
