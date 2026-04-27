@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import { supabase } from "../../../lib/supabaseClient";
 
 const LARGE_FILE_LIMIT_MB = 8;
@@ -100,6 +101,13 @@ export default function AdminUploadsPage() {
     setErrorText("");
   }
 
+  function clearSelectedFile() {
+    setFile(null);
+    setFileName("");
+    const input = document.getElementById("csv-upload-input");
+    if (input) input.value = "";
+  }
+
   function handleSupplierChange(value) {
     setSupplierId(value);
     const supplier = suppliersMap[value];
@@ -118,7 +126,7 @@ export default function AdminUploadsPage() {
     }
 
     if (!file) {
-      setErrorText("Выбери CSV-файл.");
+      setErrorText("Выбери CSV/XLS/XLSX-файл.");
       return;
     }
 
@@ -134,33 +142,41 @@ export default function AdminUploadsPage() {
     resetPreviewState();
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("supplierId", supplierId);
-      formData.append("priceType", priceType);
+      const ruleData = await fetchImportRule(supplierId);
+      const sourceRows = await parseSourceFile(file, ruleData.rule);
+      const normalizedRows = normalizeRowsByRule(
+        sourceRows,
+        ruleData.rule,
+        ruleData.aliases
+      );
 
-      const res = await fetch("/api/admin/uploads/preview", {
-        method: "POST",
-        body: formData
+      const rowsTotal = normalizedRows.length;
+      const rowsWithoutPn = normalizedRows.filter((r) => !r.pn).length;
+      const rowsEmptyBrand = normalizedRows.filter((r) => !r.brand).length;
+      const rowsEmptyName = normalizedRows.filter((r) => !r.name).length;
+      const rowsReady = rowsTotal - rowsWithoutPn;
+
+      setPreviewStats({
+        rowsTotal,
+        rowsWithoutPn,
+        rowsEmptyBrand,
+        rowsEmptyName,
+        rowsReady
       });
 
-      const rawText = await res.text();
-
-      let data = null;
-      try {
-        data = rawText ? JSON.parse(rawText) : null;
-      } catch {
-        throw new Error(rawText || "Сервер вернул невалидный ответ.");
-      }
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Не удалось проверить файл.");
-      }
-
-      setPreviewStats(data.stats || null);
-      setPreviewRows(data.preview || []);
+      setPreviewRows(normalizedRows.slice(0, 20));
       setPreviewReady(true);
-      setMessage("Файл проверен. Можно загружать прайс.");
+      setMessage("Файл нормализован по правилу поставщика. Можно загружать прайс.");
+
+      await postJson("/api/admin/uploads/append", { action: "reset" });
+
+      for (let i = 0; i < normalizedRows.length; i += BIG_UPLOAD_CHUNK) {
+        const chunk = normalizedRows.slice(i, i + BIG_UPLOAD_CHUNK);
+        await postJson("/api/admin/uploads/append", {
+          action: "append",
+          rows: chunk
+        });
+      }
     } catch (err) {
       console.error("Preview error:", err);
       setErrorText(err?.message || "Ошибка проверки файла.");
@@ -213,12 +229,8 @@ export default function AdminUploadsPage() {
         `Прайс успешно загружен. Вставлено: ${data.stats.rowsInserted}, пропущено: ${data.stats.rowsSkipped}.`
       );
 
-      setFile(null);
-      setFileName("");
+      clearSelectedFile();
       resetPreviewState();
-
-      const input = document.getElementById("csv-upload-input");
-      if (input) input.value = "";
 
       await loadPageData();
     } catch (err) {
@@ -236,7 +248,7 @@ export default function AdminUploadsPage() {
     }
 
     if (!file) {
-      setErrorText("Выбери CSV-файл.");
+      setErrorText("Выбери файл.");
       return;
     }
 
@@ -245,22 +257,23 @@ export default function AdminUploadsPage() {
     resetPreviewState();
 
     try {
-      setMessage("Читаю большой CSV-файл...");
+      setMessage("Получаю правило поставщика...");
 
-      const parsedRows = await parseCsvFile(file);
+      const ruleData = await fetchImportRule(supplierId);
 
-      if (!parsedRows.length) {
-        throw new Error("CSV пустой или не удалось прочитать строки.");
+      setMessage("Читаю исходный файл...");
+
+      const sourceRows = await parseSourceFile(file, ruleData.rule);
+
+      if (!sourceRows.length) {
+        throw new Error("Файл пустой или не удалось прочитать строки.");
       }
 
-      const normalizedRows = parsedRows.map((row) => ({
-        brand: String(row.brand ?? "").trim(),
-        pn: String(row.pn ?? "").trim(),
-        name: String(row.name ?? "").trim(),
-        qty: String(row.qty ?? "").trim(),
-        price_rub: String(row.price_rub ?? "").trim(),
-        price_usd: String(row.price_usd ?? "").trim()
-      }));
+      const normalizedRows = normalizeRowsByRule(
+        sourceRows,
+        ruleData.rule,
+        ruleData.aliases
+      );
 
       const rowsTotal = normalizedRows.length;
       const rowsWithoutPn = normalizedRows.filter((r) => !r.pn).length;
@@ -289,7 +302,7 @@ export default function AdminUploadsPage() {
         const chunk = normalizedRows.slice(i, i + BIG_UPLOAD_CHUNK);
 
         setMessage(
-          `Загружаю большой файл во временную таблицу: ${Math.min(
+          `Загружаю нормализованные строки во временную таблицу: ${Math.min(
             i + chunk.length,
             normalizedRows.length
           )} / ${normalizedRows.length}`
@@ -346,7 +359,7 @@ export default function AdminUploadsPage() {
 
         if (step.done) break;
 
-        insertOffset = step.nextOffset || insertOffset + 200;
+        insertOffset = step.nextOffset || insertOffset + 100;
       }
 
       setMessage("Финализирую загрузку...");
@@ -366,11 +379,7 @@ export default function AdminUploadsPage() {
       );
 
       setPreviewReady(false);
-      setFile(null);
-      setFileName("");
-
-      const input = document.getElementById("csv-upload-input");
-      if (input) input.value = "";
+      clearSelectedFile();
 
       await loadPageData();
     } catch (err) {
@@ -386,7 +395,7 @@ export default function AdminUploadsPage() {
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ margin: 0 }}>Загрузка прайсов</h1>
         <p style={{ marginTop: 8, color: "#666" }}>
-          Загрузка CSV во временную таблицу, проверка и перенос в offers
+          Загрузка CSV/XLS/XLSX во временную таблицу, проверка и перенос в offers
         </p>
       </div>
 
@@ -432,11 +441,11 @@ export default function AdminUploadsPage() {
                 </select>
               </Field>
 
-              <Field label="CSV-файл">
+              <Field label="Файл прайса">
                 <input
                   id="csv-upload-input"
                   type="file"
-                  accept=".csv,text/csv"
+                  accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   onChange={(e) => {
                     const nextFile = e.target.files?.[0] || null;
                     setFile(nextFile);
@@ -517,7 +526,7 @@ export default function AdminUploadsPage() {
               <br />
               1. Выбираешь поставщика
               <br />
-              2. Прикрепляешь CSV
+              2. Прикрепляешь файл
               <br />
               3. Нажимаешь <b>Проверить файл</b>
               <br />
@@ -697,6 +706,189 @@ async function postJson(url, payload) {
   }
 
   return data;
+}
+
+async function fetchImportRule(supplierId) {
+  const res = await fetch(`/api/admin/uploads/rule?supplierId=${supplierId}`, {
+    method: "GET"
+  });
+
+  const rawText = await res.text();
+
+  let data = null;
+  try {
+    data = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    throw new Error(rawText || "Сервер вернул невалидный ответ по правилу.");
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.error || "Не удалось получить правило поставщика.");
+  }
+
+  return data;
+}
+
+async function parseSourceFile(file, rule) {
+  const ext = getFileExtension(file.name);
+
+  if (ext === "csv") {
+    return await parseCsvFile(file);
+  }
+
+  if (ext === "xlsx" || ext === "xls") {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: "array" });
+
+    const sheetName =
+      rule.sheet_name && workbook.SheetNames.includes(rule.sheet_name)
+        ? rule.sheet_name
+        : workbook.SheetNames[0];
+
+    if (!sheetName) {
+      throw new Error("В Excel-файле не найден лист для чтения.");
+    }
+
+    const sheet = workbook.Sheets[sheetName];
+    const matrix = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      raw: false,
+      defval: ""
+    });
+
+    return matrixToObjects(matrix, rule);
+  }
+
+  throw new Error("Поддерживаются только csv, xls, xlsx.");
+}
+
+function matrixToObjects(matrix, rule) {
+  const headerRowIndex = Math.max(0, Number(rule.header_row || 1) - 1);
+  const dataStartIndex = Math.max(0, Number(rule.data_start_row || 2) - 1);
+
+  const headers = (matrix[headerRowIndex] || []).map((cell) =>
+    String(cell ?? "").trim()
+  );
+
+  if (!headers.length) {
+    throw new Error("Не удалось прочитать строку заголовков из Excel.");
+  }
+
+  const rows = [];
+
+  for (let i = dataStartIndex; i < matrix.length; i += 1) {
+    const row = matrix[i] || [];
+    const obj = {};
+
+    headers.forEach((header, idx) => {
+      obj[header] = row[idx] ?? "";
+    });
+
+    rows.push(obj);
+  }
+
+  return rows;
+}
+
+function buildAliasMap(aliases) {
+  const map = {
+    pn: [],
+    name: [],
+    qty: [],
+    brand: [],
+    price: []
+  };
+
+  for (const item of aliases || []) {
+    const field = String(item.field_name || "").trim();
+    const sourceHeader = String(item.source_header || "").trim();
+
+    if (!field || !sourceHeader) continue;
+    if (!map[field]) map[field] = [];
+    map[field].push(sourceHeader);
+  }
+
+  return map;
+}
+
+function findColumnName(sourceRows, explicitName, aliasList = []) {
+  const firstRow = sourceRows?.[0] || {};
+  const availableHeaders = Object.keys(firstRow);
+
+  if (explicitName && availableHeaders.includes(explicitName)) {
+    return explicitName;
+  }
+
+  for (const alias of aliasList) {
+    if (availableHeaders.includes(alias)) {
+      return alias;
+    }
+  }
+
+  return null;
+}
+
+function normalizeRowsByRule(sourceRows, rule, aliases) {
+  if (!Array.isArray(sourceRows) || sourceRows.length === 0) {
+    return [];
+  }
+
+  const aliasMap = buildAliasMap(aliases);
+
+  const pnColumn = findColumnName(sourceRows, rule.pn_column, aliasMap.pn);
+  const nameColumn = findColumnName(sourceRows, rule.name_column, aliasMap.name);
+  const qtyColumn = findColumnName(sourceRows, rule.qty_column, aliasMap.qty);
+  const brandColumn = findColumnName(sourceRows, rule.brand_column, aliasMap.brand);
+  const priceColumn = findColumnName(sourceRows, rule.price_column, aliasMap.price);
+
+  if (!pnColumn) {
+    throw new Error("Не найдена колонка артикула (pn).");
+  }
+
+  if (!nameColumn) {
+    throw new Error("Не найдена колонка наименования (name).");
+  }
+
+  if (!priceColumn) {
+    throw new Error("Не найдена колонка цены (price).");
+  }
+
+  return sourceRows.map((row) => {
+    const pn = cleanValue(row[pnColumn], rule.trim_values);
+    const name = cleanValue(row[nameColumn], rule.trim_values);
+    const qty = qtyColumn ? cleanValue(row[qtyColumn], rule.trim_values) : "";
+
+    let brand = "";
+    if (rule.brand_mode === "fixed") {
+      brand = cleanValue(rule.brand_fixed, true);
+    } else if (rule.brand_mode === "column") {
+      brand = brandColumn ? cleanValue(row[brandColumn], rule.trim_values) : "";
+    }
+
+    let priceValue = cleanValue(row[priceColumn], rule.trim_values);
+    if (rule.replace_comma_in_price) {
+      priceValue = priceValue.replace(",", ".");
+    }
+
+    return {
+      brand,
+      pn,
+      name,
+      qty: rule.qty_mode === "fixed" ? cleanValue(rule.qty_fixed, true) : qty,
+      price_rub: rule.price_currency === "rub" ? priceValue : "",
+      price_usd: rule.price_currency === "usd" ? priceValue : ""
+    };
+  });
+}
+
+function cleanValue(value, trim = true) {
+  const s = String(value ?? "");
+  return trim ? s.trim() : s;
+}
+
+function getFileExtension(fileName = "") {
+  const parts = String(fileName).toLowerCase().split(".");
+  return parts.length > 1 ? parts.pop() : "";
 }
 
 function parseCsvFile(file) {
