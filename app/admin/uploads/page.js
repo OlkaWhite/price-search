@@ -853,32 +853,53 @@ function normalizeRowsByRule(sourceRows, rule, aliases) {
     throw new Error("Не найдена колонка цены (price).");
   }
 
-  return sourceRows.map((row) => {
-    const pn = cleanValue(row[pnColumn], rule.trim_values);
-    const name = cleanValue(row[nameColumn], rule.trim_values);
-    const qty = qtyColumn ? cleanValue(row[qtyColumn], rule.trim_values) : "";
+  const skipQtyValues = Array.isArray(rule.skip_qty_values)
+    ? rule.skip_qty_values.map((x) => String(x || "").trim().toLowerCase()).filter(Boolean)
+    : [];
 
-    let brand = "";
-    if (rule.brand_mode === "fixed") {
-      brand = cleanValue(rule.brand_fixed, true);
-    } else if (rule.brand_mode === "column") {
-      brand = brandColumn ? cleanValue(row[brandColumn], rule.trim_values) : "";
-    }
+  return sourceRows
+    .map((row) => {
+      const pn = cleanValue(row[pnColumn], rule.trim_values);
+      const name = cleanValue(row[nameColumn], rule.trim_values);
+      const qty = qtyColumn ? cleanValue(row[qtyColumn], rule.trim_values) : "";
 
-    let priceValue = cleanValue(row[priceColumn], rule.trim_values);
-    if (rule.replace_comma_in_price) {
-      priceValue = priceValue.replace(",", ".");
-    }
+      let brand = "";
+      if (rule.brand_mode === "fixed") {
+        brand = cleanValue(rule.brand_fixed, true);
+      } else if (rule.brand_mode === "column") {
+        brand = brandColumn ? cleanValue(row[brandColumn], rule.trim_values) : "";
+      }
 
-    return {
-      brand,
-      pn,
-      name,
-      qty: rule.qty_mode === "fixed" ? cleanValue(rule.qty_fixed, true) : qty,
-      price_rub: rule.price_currency === "rub" ? priceValue : "",
-      price_usd: rule.price_currency === "usd" ? priceValue : ""
-    };
-  });
+      let priceValue = cleanValue(row[priceColumn], rule.trim_values);
+      if (rule.replace_comma_in_price) {
+        priceValue = priceValue.replace(",", ".");
+      }
+
+      return {
+        brand,
+        pn,
+        name,
+        qty: rule.qty_mode === "fixed" ? cleanValue(rule.qty_fixed, true) : qty,
+        price_rub: rule.price_currency === "rub" ? priceValue : "",
+        price_usd: rule.price_currency === "usd" ? priceValue : ""
+      };
+    })
+    .filter((row) => {
+      if (rule.skip_empty_pn && !row.pn) {
+        return false;
+      }
+
+      if (rule.skip_empty_qty && !String(row.qty || "").trim()) {
+        return false;
+      }
+
+      const qtyLower = String(row.qty || "").trim().toLowerCase();
+      if (skipQtyValues.includes(qtyLower)) {
+        return false;
+      }
+
+      return true;
+    });
 }
 
 function cleanValue(value, trim = true) {
