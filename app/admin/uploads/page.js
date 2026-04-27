@@ -145,6 +145,8 @@ export default function AdminUploadsPage() {
     const ruleData = await fetchImportRule(supplierId);
     const parsed = await parseSourceFile(file, ruleData.rule);
     const sourceRows = parsed.rows;
+    console.log("IMPORT DEBUG", parsed.debug);
+    
 
     console.log("IMPORT DEBUG", {
       supplierId,
@@ -749,6 +751,7 @@ async function parseSourceFile(file, rule) {
       rows: parsed.rows,
       debug: {
         fileType: "csv",
+        matrixRows: matrix.length,
         headerRowIndex: parsed.debug.headerRowIndex,
         dataStartIndex: parsed.debug.dataStartIndex,
         rawHeaderRow: parsed.debug.rawHeaderRow,
@@ -761,21 +764,30 @@ async function parseSourceFile(file, rule) {
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: "array" });
 
+    const sheetNames = workbook.SheetNames || [];
+
     const sheetName =
-      rule.sheet_name && workbook.SheetNames.includes(rule.sheet_name)
+      rule.sheet_name && sheetNames.includes(rule.sheet_name)
         ? rule.sheet_name
-        : workbook.SheetNames[0];
+        : sheetNames[0];
 
     if (!sheetName) {
-      throw new Error("В Excel-файле не найден лист для чтения.");
+      throw new Error(`В Excel-файле не найден лист. Листы: ${sheetNames.join(" | ")}`);
     }
 
     const sheet = workbook.Sheets[sheetName];
     const matrix = XLSX.utils.sheet_to_json(sheet, {
       header: 1,
       raw: false,
-      defval: ""
+      defval: "",
+      blankrows: true
     });
+
+    if (!matrix.length) {
+      throw new Error(
+        `Excel прочитан, но лист пустой. Листы: ${sheetNames.join(" | ")}. Выбран лист: ${sheetName}`
+      );
+    }
 
     const parsed = matrixToObjects(matrix, rule);
 
@@ -783,11 +795,14 @@ async function parseSourceFile(file, rule) {
       rows: parsed.rows,
       debug: {
         fileType: ext,
+        sheetNames,
         sheetName,
+        matrixRows: matrix.length,
         headerRowIndex: parsed.debug.headerRowIndex,
         dataStartIndex: parsed.debug.dataStartIndex,
         rawHeaderRow: parsed.debug.rawHeaderRow,
-        normalizedHeaders: parsed.debug.normalizedHeaders
+        normalizedHeaders: parsed.debug.normalizedHeaders,
+        maxColumns: parsed.debug.maxColumns
       }
     };
   }
