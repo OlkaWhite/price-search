@@ -112,33 +112,33 @@ export async function POST(req) {
           uploaded_at: new Date().toISOString()
         }));
 
-     for (let i = 0; i < normalizedRows.length; i += INSERT_CHUNK) {
-  const chunk = normalizedRows.slice(i, i + INSERT_CHUNK);
+      for (let i = 0; i < normalizedRows.length; i += INSERT_CHUNK) {
+        const chunk = normalizedRows.slice(i, i + INSERT_CHUNK);
 
-  const { error: insertError } = await supabaseAdmin
-    .from("offers")
-    .insert(chunk);
+        const { error: insertError } = await supabaseAdmin
+          .from("offers")
+          .insert(chunk);
 
-  if (insertError) {
-    console.error("Insert chunk error:", insertError, {
-      supplierId,
-      chunkSize: chunk.length,
-      samplePn: chunk[0]?.pn || null
-    });
+        if (insertError) {
+          console.error("Insert chunk error:", insertError, {
+            supplierId,
+            chunkSize: chunk.length,
+            samplePn: chunk[0]?.pn || null
+          });
 
-    return Response.json(
-      {
-        error: `Ошибка вставки в offers: ${insertError.message}`,
-        details: insertError
-      },
-      { status: 500 }
-    );
-  }
+          return Response.json(
+            {
+              error: `Ошибка вставки в offers: ${insertError.message}`,
+              details: insertError
+            },
+            { status: 500 }
+          );
+        }
 
-  rowsInserted += chunk.length;
+        rowsInserted += chunk.length;
 
-  await new Promise((resolve) => setTimeout(resolve, 80));
-}
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      }
 
       offset += READ_CHUNK;
     }

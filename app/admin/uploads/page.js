@@ -279,27 +279,9 @@ export default function AdminUploadsPage() {
 
       setMessage("Очищаю временную таблицу...");
 
-      const clearRes = await fetch("/api/admin/uploads/append", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          action: "reset"
-        })
+      await postJson("/api/admin/uploads/append", {
+        action: "reset"
       });
-
-      const clearRaw = await clearRes.text();
-      let clearData = null;
-      try {
-        clearData = clearRaw ? JSON.parse(clearRaw) : null;
-      } catch {
-        throw new Error(clearRaw || "Сервер вернул невалидный ответ при очистке.");
-      }
-
-      if (!clearRes.ok) {
-        throw new Error(clearData?.error || "Не удалось очистить временную таблицу.");
-      }
 
       let uploaded = 0;
 
@@ -313,60 +295,74 @@ export default function AdminUploadsPage() {
           )} / ${normalizedRows.length}`
         );
 
-        const appendRes = await fetch("/api/admin/uploads/append", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            action: "append",
-            rows: chunk
-          })
+        await postJson("/api/admin/uploads/append", {
+          action: "append",
+          rows: chunk
         });
-
-        const appendRaw = await appendRes.text();
-        let appendData = null;
-        try {
-          appendData = appendRaw ? JSON.parse(appendRaw) : null;
-        } catch {
-          throw new Error(appendRaw || "Сервер вернул невалидный ответ при дозагрузке.");
-        }
-
-        if (!appendRes.ok) {
-          throw new Error(appendData?.error || "Не удалось загрузить часть файла.");
-        }
 
         uploaded += chunk.length;
       }
 
-      setMessage(`Файл загружен во временную таблицу (${uploaded} строк). Переношу в offers...`);
+      setMessage(`Файл загружен во временную таблицу (${uploaded} строк). Подготавливаю перенос...`);
 
-      const commitRes = await fetch("/api/admin/uploads/commit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          supplierId,
-          fileName,
-          priceType
-        })
+      const prepare = await postJson("/api/admin/uploads/commit-step", {
+        action: "prepare",
+        supplierId,
+        fileName,
+        priceType
       });
 
-      const commitRaw = await commitRes.text();
-      let commitData = null;
-      try {
-        commitData = commitRaw ? JSON.parse(commitRaw) : null;
-      } catch {
-        throw new Error(commitRaw || "Сервер вернул невалидный ответ на финальной загрузке.");
+      const totalOldRows = prepare.oldRowsCount || 0;
+      let deletedRows = 0;
+
+      if (totalOldRows > 0) {
+        while (true) {
+          setMessage(`Удаляю старый прайс поставщика: ${deletedRows} / ${totalOldRows}`);
+
+          const step = await postJson("/api/admin/uploads/commit-step", {
+            action: "deleteChunk",
+            supplierId
+          });
+
+          deletedRows += step.deleted || 0;
+
+          if (step.done) break;
+        }
       }
 
-      if (!commitRes.ok) {
-        throw new Error(commitData?.error || "Не удалось загрузить прайс.");
+      let insertOffset = 0;
+      let insertedRows = 0;
+
+      while (true) {
+        setMessage(`Переношу строки в offers: ${insertedRows} / ${prepare.rowsTotal}`);
+
+        const step = await postJson("/api/admin/uploads/commit-step", {
+          action: "insertChunk",
+          supplierId,
+          offset: insertOffset
+        });
+
+        insertedRows += step.inserted || 0;
+
+        if (step.done) break;
+
+        insertOffset = step.nextOffset || insertOffset + 200;
       }
+
+      setMessage("Финализирую загрузку...");
+
+      await postJson("/api/admin/uploads/commit-step", {
+        action: "finalize",
+        supplierId,
+        fileName,
+        priceType,
+        rowsTotal: prepare.rowsTotal || 0,
+        rowsInserted: insertedRows,
+        rowsSkipped: prepare.rowsSkipped || 0
+      });
 
       setMessage(
-        `Большой прайс успешно загружен. Вставлено: ${commitData.stats.rowsInserted}, пропущено: ${commitData.stats.rowsSkipped}.`
+        `Большой прайс успешно загружен. Вставлено: ${insertedRows}, пропущено: ${prepare.rowsSkipped || 0}.`
       );
 
       setPreviewReady(false);
@@ -395,7 +391,6 @@ export default function AdminUploadsPage() {
       </div>
 
       {message && <div style={successBoxStyle}>{message}</div>}
-
       {errorText && <div style={errorBoxStyle}>{errorText}</div>}
 
       {loading ? (
@@ -677,6 +672,31 @@ export default function AdminUploadsPage() {
       )}
     </div>
   );
+}
+
+async function postJson(url, payload) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const rawText = await res.text();
+
+  let data = null;
+  try {
+    data = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    throw new Error(rawText || "Сервер вернул невалидный ответ.");
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.error || "Ошибка запроса.");
+  }
+
+  return data;
 }
 
 function parseCsvFile(file) {
