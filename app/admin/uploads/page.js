@@ -802,19 +802,29 @@ function matrixToObjects(matrix, rule) {
   const rawHeaderRow = matrix[headerRowIndex] || [];
   const headers = rawHeaderRow.map((cell) => String(cell ?? "").trim());
 
-  if (!headers.length) {
-    throw new Error("Не удалось прочитать строку заголовков из Excel.");
-  }
+  const maxColumns = matrix.reduce((max, row) => {
+    const len = Array.isArray(row) ? row.length : 0;
+    return Math.max(max, len);
+  }, 0);
 
   const rows = [];
 
   for (let i = dataStartIndex; i < matrix.length; i += 1) {
-    const row = matrix[i] || [];
+    const row = Array.isArray(matrix[i]) ? matrix[i] : [];
     const obj = {};
 
-    headers.forEach((header, idx) => {
-      obj[header] = row[idx] ?? "";
-    });
+    // Индексные колонки создаём ВСЕГДА
+    for (let col = 0; col < maxColumns; col += 1) {
+      obj[`__col_${col + 1}`] = row[col] ?? "";
+    }
+
+    // Именованные заголовки создаём только если они есть
+    for (let col = 0; col < headers.length; col += 1) {
+      const header = String(headers[col] ?? "").trim();
+      if (header) {
+        obj[header] = row[col] ?? "";
+      }
+    }
 
     rows.push(obj);
   }
@@ -825,7 +835,8 @@ function matrixToObjects(matrix, rule) {
       headerRowIndex: headerRowIndex + 1,
       dataStartIndex: dataStartIndex + 1,
       rawHeaderRow,
-      normalizedHeaders: headers
+      normalizedHeaders: headers,
+      maxColumns
     }
   };
 }
@@ -1034,7 +1045,7 @@ function parseCsvFile(file) {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: false,
-      skipEmptyLines: true,
+      skipEmptyLines: false,
       worker: true,
       complete: (results) => {
         if (results.errors?.length) {
