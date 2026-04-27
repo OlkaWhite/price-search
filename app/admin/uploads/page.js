@@ -1081,13 +1081,7 @@ function normalizeQtyValue(value, rule = {}) {
 function normalizePriceValue(value, trim = true, replaceComma = true) {
   if (value === null || value === undefined) return "";
 
-  let s = "";
-
-  if (typeof value === "number") {
-    s = String(value);
-  } else {
-    s = String(value);
-  }
+  let s = String(value);
 
   if (trim) {
     s = s.trim();
@@ -1098,12 +1092,29 @@ function normalizePriceValue(value, trim = true, replaceComma = true) {
   // убираем обычные и неразрывные пробелы
   s = s.replace(/\u00A0/g, "").replace(/\s+/g, "");
 
-  // если число уже пришло как 7120.5, оставляем
-  // если пришло как 7 120,50 -> 7120.50
-  if (replaceComma) {
-    s = s.replace(",", ".");
+  // убираем валютные символы и лишний мусор по краям
+  s = s.replace(/\$/g, "").replace(/₽/g, "");
+
+  // Если есть и точка, и запятая:
+  // 58.812,24 -> 58812.24
+  if (s.includes(".") && s.includes(",")) {
+    if (s.lastIndexOf(",") > s.lastIndexOf(".")) {
+      s = s.replace(/\./g, "");
+      s = s.replace(",", ".");
+    } else {
+      s = s.replace(/,/g, "");
+    }
+    return s;
   }
 
+  // Только запятая:
+  // 58812,24 -> 58812.24
+  if (replaceComma && s.includes(",")) {
+    s = s.replace(",", ".");
+    return s;
+  }
+
+  // Только точки — оставляем как есть
   return s;
 }
 function getFileExtension(fileName = "") {
