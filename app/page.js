@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 import { useAuthState } from "../components/AuthProvider";
 
 const PAGE_SIZE = 50;
 
 export default function Page() {
+  const router = useRouter();
   const { isAdmin, user } = useAuthState();
 
   const [query, setQuery] = useState("");
@@ -20,6 +22,8 @@ export default function Page() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadingBrands, setLoadingBrands] = useState(false);
   const [errorText, setErrorText] = useState("");
+  const [message, setMessage] = useState("");
+  const [addingKey, setAddingKey] = useState("");
 
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -124,6 +128,7 @@ export default function Page() {
     setLoadingMore(false);
     setLoadingBrands(false);
     setErrorText("");
+    setMessage("");
     setRows([]);
     setSearchBrands([]);
     setPage(0);
@@ -160,7 +165,7 @@ export default function Page() {
         email: user?.email || null,
         query: (queryText || "").trim() || `[brand:${brandValue}]`,
         normalized_query: normalizedQuery || `[brand:${normalizedBrand}]`,
-        results_count: Number(resultsCount) || 0,
+        results_count: Number(resultsCount) || 0
       });
     } catch (e) {
       console.error("Failed to write search log", e);
@@ -221,9 +226,7 @@ export default function Page() {
     try {
       const { data, error } = await buildBrandsQuery();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       const uniq = Array.from(
         new Set((data || []).map((x) => x.brand).filter(Boolean))
@@ -255,9 +258,7 @@ export default function Page() {
       const req = buildRowsQuery().range(from, to);
       const { data, error } = await req;
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       const incoming = data || [];
 
@@ -275,6 +276,7 @@ export default function Page() {
       console.error("runSearch error:", err);
 
       setErrorText("Ничего не найдено. Попробуйте ввести без символов - / \\");
+      setMessage("");
 
       if (reset) {
         setRows([]);
@@ -296,6 +298,7 @@ export default function Page() {
     if (!canSearch || loading || loadingMore) return;
 
     setErrorText("");
+    setMessage("");
     setRows([]);
     setSearchBrands([]);
     setPage(0);
@@ -306,7 +309,7 @@ export default function Page() {
     logSearchAction({
       queryText: query,
       brandValue: brand,
-      resultsCount: foundCount,
+      resultsCount: foundCount
     }).catch((e) => console.error("logSearchAction error:", e));
   }
 
@@ -326,7 +329,7 @@ export default function Page() {
   function scrollToTop() {
     window.scrollTo({
       top: 0,
-      behavior: "smooth",
+      behavior: "smooth"
     });
   }
 
@@ -334,7 +337,7 @@ export default function Page() {
     if (typeof r.price_byn === "number") {
       return r.price_byn.toLocaleString("ru-RU", {
         minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+        maximumFractionDigits: 2
       });
     }
 
@@ -349,15 +352,122 @@ export default function Page() {
     return "—";
   }
 
+  async function handleAddToOrder(r) {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    const rowKey = String(r.id || `${r.brand}-${r.pn}`);
+    setAddingKey(rowKey);
+    setErrorText("");
+    setMessage("");
+
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("company_name, contact_name, phone, telegram")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      const { data: existingOrders, error: ordersError } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("status", "new")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (ordersError) throw ordersError;
+
+      let orderId = existingOrders?.[0]?.id || null;
+
+      if (!orderId) {
+        const { data: newOrder, error: createOrderError } = await supabase
+          .from("orders")
+          .insert({
+            user_id: user.id,
+            customer_name:
+              profileData?.company_name ||
+              profileData?.contact_name ||
+              user.email ||
+              "Клиент",
+            customer_contact:
+              profileData?.phone ||
+              profileData?.telegram ||
+              user.email ||
+              null,
+            customer_comment: null,
+            status: "new",
+            invoice_requested: false
+          })
+          .select("id")
+          .single();
+
+        if (createOrderError) throw createOrderError;
+        orderId = newOrder.id;
+      }
+
+      const { data: existingItem, error: itemReadError } = await supabase
+        .from("order_items")
+        .select("id, order_qty")
+        .eq("order_id", orderId)
+        .eq("brand", r.brand || "")
+        .eq("pn", r.pn || "")
+        .maybeSingle();
+
+      if (itemReadError) throw itemReadError;
+
+      if (existingItem?.id) {
+        const { error: updateItemError } = await supabase
+          .from("order_items")
+          .update({
+            order_qty: Number(existingItem.order_qty || 0) + 1
+          })
+          .eq("id", existingItem.id);
+
+        if (updateItemError) throw updateItemError;
+      } else {
+        const { error: insertItemError } = await supabase
+          .from("order_items")
+          .insert({
+            order_id: orderId,
+            brand: r.brand || null,
+            pn: r.pn || null,
+            name: r.name || null,
+            order_qty: 1,
+            stock_qty: r.qty || null,
+            display_price: getDisplayPrice(r),
+            price_byn: Number(r.price_byn) || 0,
+            requested_price_byn: null
+          });
+
+        if (insertItemError) throw insertItemError;
+      }
+
+      setMessage("Товар добавлен в заявку.");
+    } catch (err) {
+      console.error("Add to order error:", err);
+      setErrorText(err?.message || "Не удалось добавить товар в заявку.");
+    } finally {
+      setAddingKey("");
+    }
+  }
+
   return (
     <div
       style={{
         width: "98vw",
         maxWidth: 2240,
         margin: "0 auto",
-        padding: "20px 16px 120px",
+        padding: "20px 16px 120px"
       }}
     >
+      {message && <div style={successBoxStyle}>{message}</div>}
+      {errorText && rows.length > 0 && <div style={errorBoxStyle}>{errorText}</div>}
+
       <div style={searchHeroStyle}>
         <h2 style={searchHeroTitleStyle}>Поиск по прайсам поставщиков</h2>
 
@@ -411,7 +521,7 @@ export default function Page() {
             style={{
               ...searchButtonStyle,
               opacity: !canSearch || loading ? 0.65 : 1,
-              cursor: !canSearch || loading ? "default" : "pointer",
+              cursor: !canSearch || loading ? "default" : "pointer"
             }}
           >
             {loading ? "Ищу..." : "Поиск"}
@@ -443,6 +553,7 @@ export default function Page() {
               <col style={{ width: "90px" }} />
               <col style={{ width: "140px" }} />
               <col style={{ width: "120px" }} />
+              {user ? <col style={{ width: "130px" }} /> : null}
               {isAdmin ? <col style={{ width: "180px" }} /> : null}
             </colgroup>
 
@@ -455,13 +566,14 @@ export default function Page() {
                   "Кол-во",
                   "BYN с НДС",
                   "Дата прайса",
-                  ...(isAdmin ? ["Прайс"] : []),
+                  ...(user ? ["Заказ"] : []),
+                  ...(isAdmin ? ["Прайс"] : [])
                 ].map((h) => (
                   <th
                     key={h}
                     style={{
                       ...searchThStyle,
-                      whiteSpace: h === "Наименование" ? "normal" : "nowrap",
+                      whiteSpace: h === "Наименование" ? "normal" : "nowrap"
                     }}
                   >
                     {h}
@@ -471,38 +583,58 @@ export default function Page() {
             </thead>
 
             <tbody>
-              {rows.map((r, idx) => (
-                <tr
-                  key={`${r.brand}-${r.pn}-${r.price_byn}-${idx}`}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#F8FAFF";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "";
-                  }}
-                  style={{ transition: "background 0.15s ease" }}
-                >
-                  <td style={brandCellStyle}>{r.brand || "—"}</td>
-                  <td style={pnCellStyle}>{r.pn || "—"}</td>
-                  <td style={nameCellStyle}>{r.name || "—"}</td>
-                  <td style={qtyCellStyle}>{r.qty ?? "—"}</td>
-                  <td style={priceCellStyle}>{getDisplayPrice(r)}</td>
-                  <td style={dateCellStyle}>{formatUpdateDate(r.last_upload_at)}</td>
+              {rows.map((r, idx) => {
+                const rowKey = String(r.id || `${r.brand}-${r.pn}-${idx}`);
 
-                  {isAdmin ? (
-                    <td style={searchTdStyle}>{r.pricelist_name || "—"}</td>
-                  ) : null}
-                </tr>
-              ))}
+                return (
+                  <tr
+                    key={`${r.brand}-${r.pn}-${r.price_byn}-${idx}`}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#F8FAFF";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "";
+                    }}
+                    style={{ transition: "background 0.15s ease" }}
+                  >
+                    <td style={brandCellStyle}>{r.brand || "—"}</td>
+                    <td style={pnCellStyle}>{r.pn || "—"}</td>
+                    <td style={nameCellStyle}>{r.name || "—"}</td>
+                    <td style={qtyCellStyle}>{r.qty ?? "—"}</td>
+                    <td style={priceCellStyle}>{getDisplayPrice(r)}</td>
+                    <td style={dateCellStyle}>{formatUpdateDate(r.last_upload_at)}</td>
+
+                    {user ? (
+                      <td style={searchTdStyle}>
+                        <button
+                          onClick={() => handleAddToOrder(r)}
+                          disabled={addingKey === rowKey}
+                          style={{
+                            ...orderButtonStyle,
+                            opacity: addingKey === rowKey ? 0.7 : 1,
+                            cursor: addingKey === rowKey ? "default" : "pointer"
+                          }}
+                        >
+                          {addingKey === rowKey ? "Добавляю..." : "В заказ"}
+                        </button>
+                      </td>
+                    ) : null}
+
+                    {isAdmin ? (
+                      <td style={searchTdStyle}>{r.pricelist_name || "—"}</td>
+                    ) : null}
+                  </tr>
+                );
+              })}
 
               {rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6 + (isAdmin ? 1 : 0)}
+                    colSpan={6 + (user ? 1 : 0) + (isAdmin ? 1 : 0)}
                     style={{
                       ...searchTdStyle,
                       padding: "16px 12px",
-                      color: "#666",
+                      color: "#666"
                     }}
                   >
                     {canSearch
@@ -525,7 +657,7 @@ export default function Page() {
           style={{
             display: "flex",
             justifyContent: "center",
-            marginTop: 20,
+            marginTop: 20
           }}
         >
           <button
@@ -540,7 +672,7 @@ export default function Page() {
               cursor: loadingMore ? "default" : "pointer",
               fontSize: 14,
               fontWeight: 600,
-              boxShadow: "0 6px 16px rgba(17, 24, 39, 0.14)",
+              boxShadow: "0 6px 16px rgba(17, 24, 39, 0.14)"
             }}
           >
             {loadingMore ? "Загружаю..." : "Загрузить еще"}
@@ -564,7 +696,7 @@ export default function Page() {
             cursor: "pointer",
             fontSize: 14,
             fontWeight: 600,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.18)"
           }}
         >
           В начало списка
@@ -582,21 +714,21 @@ const searchHeroStyle = {
   borderRadius: 18,
   background:
     "linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(248,250,252,1) 100%)",
-  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.05)",
+  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.05)"
 };
 
 const searchHeroTitleStyle = {
   margin: 0,
   fontSize: 18,
   fontWeight: 700,
-  color: "#111827",
+  color: "#111827"
 };
 
 const searchHeroTextStyle = {
   marginTop: 8,
   color: "#6B7280",
   fontSize: 14,
-  lineHeight: 1.5,
+  lineHeight: 1.5
 };
 
 const searchControlsRowStyle = {
@@ -605,7 +737,7 @@ const searchControlsRowStyle = {
   alignItems: "center",
   marginTop: 18,
   flexWrap: "wrap",
-  justifyContent: "flex-start",
+  justifyContent: "flex-start"
 };
 
 const searchInputStyle = {
@@ -618,7 +750,7 @@ const searchInputStyle = {
   background: "#fff",
   color: "#111827",
   outline: "none",
-  boxShadow: "inset 0 1px 2px rgba(15,23,42,0.03)",
+  boxShadow: "inset 0 1px 2px rgba(15,23,42,0.03)"
 };
 
 const searchSelectStyle = {
@@ -628,7 +760,7 @@ const searchSelectStyle = {
   borderRadius: 12,
   fontSize: 14,
   background: "#fff",
-  color: "#111827",
+  color: "#111827"
 };
 
 const searchButtonStyle = {
@@ -640,7 +772,7 @@ const searchButtonStyle = {
   cursor: "pointer",
   fontSize: 14,
   fontWeight: 600,
-  boxShadow: "0 6px 16px rgba(17, 24, 39, 0.14)",
+  boxShadow: "0 6px 16px rgba(17, 24, 39, 0.14)"
 };
 
 const searchMetaRowStyle = {
@@ -648,7 +780,7 @@ const searchMetaRowStyle = {
   gap: 10,
   alignItems: "center",
   flexWrap: "wrap",
-  marginTop: 14,
+  marginTop: 14
 };
 
 const searchMetaBadgeStyle = {
@@ -660,7 +792,7 @@ const searchMetaBadgeStyle = {
   background: "#F3F4F6",
   color: "#374151",
   fontSize: 13,
-  fontWeight: 500,
+  fontWeight: 500
 };
 
 const searchHintChipStyle = {
@@ -671,7 +803,7 @@ const searchHintChipStyle = {
   background: "#EEF2FF",
   color: "#3559A8",
   fontSize: 12,
-  fontWeight: 600,
+  fontWeight: 600
 };
 
 const searchTableWrapStyle = {
@@ -679,7 +811,7 @@ const searchTableWrapStyle = {
   border: "1px solid #E5E7EB",
   borderRadius: 16,
   background: "#fff",
-  boxShadow: "0 6px 20px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 6px 20px rgba(15, 23, 42, 0.04)"
 };
 
 const searchTableStyle = {
@@ -687,7 +819,7 @@ const searchTableStyle = {
   borderCollapse: "separate",
   borderSpacing: 0,
   fontSize: 13,
-  tableLayout: "fixed",
+  tableLayout: "fixed"
 };
 
 const searchThStyle = {
@@ -700,7 +832,7 @@ const searchThStyle = {
   fontWeight: 600,
   textTransform: "uppercase",
   letterSpacing: "0.4px",
-  verticalAlign: "top",
+  verticalAlign: "top"
 };
 
 const searchTdStyle = {
@@ -710,21 +842,21 @@ const searchTdStyle = {
   color: "#374151",
   lineHeight: 1.5,
   fontSize: 14,
-  fontFamily: "inherit",
+  fontFamily: "inherit"
 };
 
 const brandCellStyle = {
   ...searchTdStyle,
   color: "#4B5563",
   fontWeight: 500,
-  whiteSpace: "nowrap",
+  whiteSpace: "nowrap"
 };
 
 const pnCellStyle = {
   ...searchTdStyle,
   color: "#4B5563",
   fontWeight: 500,
-  whiteSpace: "nowrap",
+  whiteSpace: "nowrap"
 };
 
 const nameCellStyle = {
@@ -733,25 +865,54 @@ const nameCellStyle = {
   fontWeight: 500,
   whiteSpace: "normal",
   overflowWrap: "anywhere",
-  wordBreak: "break-word",
+  wordBreak: "break-word"
 };
 
 const qtyCellStyle = {
   ...searchTdStyle,
   whiteSpace: "nowrap",
   textAlign: "center",
-  color: "#374151",
+  color: "#374151"
 };
 
 const priceCellStyle = {
   ...searchTdStyle,
   fontWeight: 600,
   color: "#111827",
-  whiteSpace: "nowrap",
+  whiteSpace: "nowrap"
 };
 
 const dateCellStyle = {
   ...searchTdStyle,
   color: "#6B7280",
-  whiteSpace: "nowrap",
+  whiteSpace: "nowrap"
+};
+
+const orderButtonStyle = {
+  padding: "8px 12px",
+  borderRadius: 10,
+  border: "1px solid #111827",
+  background: "#111827",
+  color: "#fff",
+  fontSize: 13,
+  fontWeight: 600,
+  whiteSpace: "nowrap"
+};
+
+const successBoxStyle = {
+  marginBottom: 16,
+  padding: 12,
+  borderRadius: 10,
+  border: "1px solid #cce5cc",
+  background: "#f3fff3",
+  color: "#2e6b2e"
+};
+
+const errorBoxStyle = {
+  marginBottom: 16,
+  padding: 12,
+  borderRadius: 10,
+  border: "1px solid #f1b5b5",
+  background: "#fff5f5",
+  color: "#9b1c1c"
 };
