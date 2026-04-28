@@ -22,7 +22,6 @@ export default function Page() {
   const [hasMore, setHasMore] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
-  const [sessionUser, setSessionUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   const lastLoggedSearchRef = useRef("");
@@ -38,12 +37,9 @@ export default function Page() {
       if (!mounted) return;
 
       if (!session?.user) {
-        setSessionUser(null);
         setIsAdmin(false);
         return;
       }
-
-      setSessionUser(session.user);
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -64,12 +60,9 @@ export default function Page() {
       if (!mounted) return;
 
       if (!session?.user) {
-        setSessionUser(null);
         setIsAdmin(false);
         return;
       }
-
-      setSessionUser(session.user);
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -270,9 +263,7 @@ export default function Page() {
 
   function buildBrandsQuery() {
     let req = supabase.from("offers_view").select("brand");
-
     req = applyTextSearch(req);
-
     return req;
   }
 
@@ -425,95 +416,84 @@ export default function Page() {
         padding: "20px 16px 120px",
       }}
     >
-      <p style={{ marginTop: 8, color: "#666", fontSize: 15 }}>
-        Введи минимум 2 символа. Ищет по <b>P/N</b> и по <b>наименованию</b>.
-        Фильтр по бренду справа от поисковой строки.
-      </p>
+      <div style={searchHeroStyle}>
+        <h2 style={searchHeroTitleStyle}>Поиск по прайсам поставщиков</h2>
 
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          alignItems: "center",
-          marginTop: 16,
-          marginBottom: 18,
-          flexWrap: "wrap",
-        }}
-      >
-        <input
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            resetSearchState();
-            setBrand("ALL");
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleSearchClick();
-            }
-          }}
-          placeholder="Поиск: парт-номер или текст..."
-          style={{
-            width: 420,
-            maxWidth: "100%",
-            padding: "10px 12px",
-            border: "1px solid #ccc",
-            borderRadius: 10,
-            fontSize: 14,
-          }}
-        />
-
-        <select
-          value={brand}
-          onChange={(e) => {
-            setBrand(e.target.value);
-          }}
-          style={{
-            padding: "10px 12px",
-            border: "1px solid #ccc",
-            borderRadius: 10,
-            fontSize: 14,
-          }}
-        >
-          <option value="ALL">Все бренды</option>
-          {visibleBrands.map((b) => (
-            <option key={b} value={b}>
-              {b}
-            </option>
-          ))}
-        </select>
-
-        <button
-          onClick={handleSearchClick}
-          disabled={!canSearch || loading}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "1px solid #111",
-            background: loading ? "#ddd" : "#111",
-            color: loading ? "#333" : "#fff",
-            cursor: loading ? "default" : "pointer",
-            fontSize: 14,
-          }}
-        >
-          {loading ? "Ищу..." : "Поиск"}
-        </button>
-
-        <div style={{ color: "#666", fontSize: 13 }}>
-          {rows.length > 0 ? `Загружено: ${rows.length}` : " "}
+        <div style={searchHeroTextStyle}>
+          Введи минимум 2 символа. Поиск идёт по <b>P/N</b> и по <b>наименованию</b>.
+          Можно искать по бренду через фильтр справа.
         </div>
 
-        {loadingBrands && (
-          <div style={{ color: "#666", fontSize: 13 }}>Обновляю бренды...</div>
-        )}
+        <div style={searchMetaRowStyle}>
+          <span style={searchHintChipStyle}>Поиск по артикулу</span>
+          <span style={searchHintChipStyle}>Поиск по наименованию</span>
+          <span style={searchHintChipStyle}>Фильтр по бренду</span>
+        </div>
+
+        <div style={searchControlsRowStyle}>
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              resetSearchState();
+              setBrand("ALL");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleSearchClick();
+              }
+            }}
+            placeholder="Поиск: парт-номер или текст..."
+            style={searchInputStyle}
+          />
+
+          <select
+            value={brand}
+            onChange={(e) => {
+              setBrand(e.target.value);
+            }}
+            style={searchSelectStyle}
+          >
+            <option value="ALL">Все бренды</option>
+            {visibleBrands.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={handleSearchClick}
+            disabled={!canSearch || loading}
+            style={{
+              ...searchButtonStyle,
+              opacity: !canSearch || loading ? 0.65 : 1,
+              cursor: !canSearch || loading ? "default" : "pointer",
+            }}
+          >
+            {loading ? "Ищу..." : "Поиск"}
+          </button>
+        </div>
+
+        <div style={searchMetaRowStyle}>
+          <span style={searchMetaBadgeStyle}>
+            {rows.length > 0 ? `Загружено: ${rows.length}` : "Результатов пока нет"}
+          </span>
+
+          {brand !== "ALL" && (
+            <span style={searchMetaBadgeStyle}>Бренд: {brand}</span>
+          )}
+
+          {loadingBrands && (
+            <span style={searchMetaBadgeStyle}>Обновляю бренды...</span>
+          )}
+        </div>
       </div>
 
       <div style={{ marginTop: 16 }}>
         <div style={searchTableWrapStyle}>
-          <table
-            style={searchTableStyle}
-          >
+          <table style={searchTableStyle}>
             <colgroup>
               <col style={{ width: "90px" }} />
               <col style={{ width: "150px" }} />
@@ -549,40 +529,36 @@ export default function Page() {
             </thead>
 
             <tbody>
-              {rows.map((r, idx) => {
-                return (
-                  <tr
-                    key={`${r.brand}-${r.pn}-${r.price_byn}-${idx}`}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#F8FAFF";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "";
-                    }}
-                    style={{ transition: "background 0.15s ease" }}
-                  >
-                    <td style={searchTdStyle}>
-                      <span style={brandBadgeStyle}>{r.brand || "—"}</span>
-                    </td>
+              {rows.map((r, idx) => (
+                <tr
+                  key={`${r.brand}-${r.pn}-${r.price_byn}-${idx}`}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#F8FAFF";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "";
+                  }}
+                  style={{ transition: "background 0.15s ease" }}
+                >
+                  <td style={searchTdStyle}>
+                    <span style={brandBadgeStyle}>{r.brand || "—"}</span>
+                  </td>
 
-                    <td style={pnCellStyle}>{r.pn || "—"}</td>
+                  <td style={pnCellStyle}>{r.pn || "—"}</td>
 
-                    <td style={nameCellStyle}>{r.name || "—"}</td>
+                  <td style={nameCellStyle}>{r.name || "—"}</td>
 
-                    <td style={qtyCellStyle}>{r.qty ?? "—"}</td>
+                  <td style={qtyCellStyle}>{r.qty ?? "—"}</td>
 
-                    <td style={priceCellStyle}>{getDisplayPrice(r)}</td>
+                  <td style={priceCellStyle}>{getDisplayPrice(r)}</td>
 
-                    <td style={dateCellStyle}>{formatUpdateDate(r.last_upload_at)}</td>
+                  <td style={dateCellStyle}>{formatUpdateDate(r.last_upload_at)}</td>
 
-                    {isAdmin ? (
-                      <td style={searchTdStyle}>
-                        {r.pricelist_name || "—"}
-                      </td>
-                    ) : null}
-                  </tr>
-                );
-              })}
+                  {isAdmin ? (
+                    <td style={searchTdStyle}>{r.pricelist_name || "—"}</td>
+                  ) : null}
+                </tr>
+              ))}
 
               {rows.length === 0 && (
                 <tr>
@@ -622,12 +598,14 @@ export default function Page() {
             disabled={loadingMore}
             style={{
               padding: "12px 18px",
-              borderRadius: 10,
-              border: "1px solid #111",
-              background: loadingMore ? "#ddd" : "#111",
+              borderRadius: 12,
+              border: "1px solid #111827",
+              background: loadingMore ? "#ddd" : "#111827",
               color: loadingMore ? "#333" : "#fff",
               cursor: loadingMore ? "default" : "pointer",
               fontSize: 14,
+              fontWeight: 600,
+              boxShadow: "0 6px 16px rgba(17, 24, 39, 0.14)",
             }}
           >
             {loadingMore ? "Загружаю..." : "Загрузить еще"}
@@ -645,11 +623,12 @@ export default function Page() {
             zIndex: 1000,
             padding: "12px 16px",
             borderRadius: 999,
-            border: "1px solid #111",
-            background: "#111",
+            border: "1px solid #111827",
+            background: "#111827",
             color: "#fff",
             cursor: "pointer",
             fontSize: 14,
+            fontWeight: 600,
             boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
           }}
         >
@@ -660,12 +639,111 @@ export default function Page() {
   );
 }
 
+const searchHeroStyle = {
+  marginTop: 8,
+  marginBottom: 20,
+  padding: "18px 18px 16px",
+  border: "1px solid #E5E7EB",
+  borderRadius: 18,
+  background:
+    "linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(248,250,252,1) 100%)",
+  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.05)",
+};
+
+const searchHeroTitleStyle = {
+  margin: 0,
+  fontSize: 18,
+  fontWeight: 700,
+  color: "#111827",
+};
+
+const searchHeroTextStyle = {
+  marginTop: 8,
+  color: "#6B7280",
+  fontSize: 14,
+  lineHeight: 1.5,
+};
+
+const searchControlsRowStyle = {
+  display: "flex",
+  gap: 12,
+  alignItems: "center",
+  marginTop: 18,
+  flexWrap: "wrap",
+};
+
+const searchInputStyle = {
+  flex: "1 1 460px",
+  minWidth: 280,
+  padding: "12px 14px",
+  border: "1px solid #D1D5DB",
+  borderRadius: 12,
+  fontSize: 14,
+  background: "#fff",
+  color: "#111827",
+  outline: "none",
+  boxShadow: "inset 0 1px 2px rgba(15,23,42,0.03)",
+};
+
+const searchSelectStyle = {
+  minWidth: 220,
+  padding: "12px 14px",
+  border: "1px solid #D1D5DB",
+  borderRadius: 12,
+  fontSize: 14,
+  background: "#fff",
+  color: "#111827",
+};
+
+const searchButtonStyle = {
+  padding: "12px 18px",
+  borderRadius: 12,
+  border: "1px solid #111827",
+  background: "#111827",
+  color: "#fff",
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 600,
+  boxShadow: "0 6px 16px rgba(17, 24, 39, 0.14)",
+};
+
+const searchMetaRowStyle = {
+  display: "flex",
+  gap: 10,
+  alignItems: "center",
+  flexWrap: "wrap",
+  marginTop: 14,
+};
+
+const searchMetaBadgeStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "8px 12px",
+  borderRadius: 999,
+  background: "#F3F4F6",
+  color: "#374151",
+  fontSize: 13,
+  fontWeight: 500,
+};
+
+const searchHintChipStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "6px 10px",
+  borderRadius: 999,
+  background: "#EEF2FF",
+  color: "#3559A8",
+  fontSize: 12,
+  fontWeight: 600,
+};
+
 const searchTableWrapStyle = {
   overflowX: "auto",
   border: "1px solid #E5E7EB",
   borderRadius: 16,
   background: "#fff",
-  boxShadow: "0 6px 20px rgba(15, 23, 42, 0.04)"
+  boxShadow: "0 6px 20px rgba(15, 23, 42, 0.04)",
 };
 
 const searchTableStyle = {
@@ -673,7 +751,7 @@ const searchTableStyle = {
   borderCollapse: "separate",
   borderSpacing: 0,
   fontSize: 13,
-  tableLayout: "fixed"
+  tableLayout: "fixed",
 };
 
 const searchThStyle = {
@@ -686,7 +764,7 @@ const searchThStyle = {
   fontWeight: 600,
   textTransform: "uppercase",
   letterSpacing: "0.4px",
-  verticalAlign: "top"
+  verticalAlign: "top",
 };
 
 const searchTdStyle = {
@@ -694,7 +772,7 @@ const searchTdStyle = {
   borderBottom: "1px solid #EEF2F7",
   verticalAlign: "top",
   color: "#222",
-  lineHeight: 1.4
+  lineHeight: 1.4,
 };
 
 const pnCellStyle = {
@@ -704,7 +782,7 @@ const pnCellStyle = {
   color: "#374151",
   whiteSpace: "normal",
   overflowWrap: "anywhere",
-  wordBreak: "break-word"
+  wordBreak: "break-word",
 };
 
 const nameCellStyle = {
@@ -713,27 +791,27 @@ const nameCellStyle = {
   color: "#1F2937",
   whiteSpace: "normal",
   overflowWrap: "anywhere",
-  wordBreak: "break-word"
+  wordBreak: "break-word",
 };
 
 const qtyCellStyle = {
   ...searchTdStyle,
   whiteSpace: "nowrap",
   textAlign: "center",
-  color: "#374151"
+  color: "#374151",
 };
 
 const priceCellStyle = {
   ...searchTdStyle,
   fontWeight: 600,
   color: "#111827",
-  whiteSpace: "nowrap"
+  whiteSpace: "nowrap",
 };
 
 const dateCellStyle = {
   ...searchTdStyle,
   color: "#6B7280",
-  whiteSpace: "nowrap"
+  whiteSpace: "nowrap",
 };
 
 const brandBadgeStyle = {
@@ -744,5 +822,5 @@ const brandBadgeStyle = {
   color: "#3559A8",
   fontSize: 12,
   fontWeight: 600,
-  lineHeight: 1.2
+  lineHeight: 1.2,
 };
