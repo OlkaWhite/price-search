@@ -540,7 +540,8 @@ export default function Page() {
                   }}
                   style={{ transition: "background 0.15s ease" }}
                 >
-                  <td style={pnCellStyle}>{r.brand || "—"}</td>
+                  <td style={brandCellStyle}>{r.brand || "—"}</td>
+
 
                   <td style={pnCellStyle}>{r.pn || "—"}</td>
 
@@ -672,7 +673,7 @@ const searchControlsRowStyle = {
 };
 
 const searchInputStyle = {
-  width: 400,
+  width: 420,
   maxWidth: "100%",
   padding: "12px 14px",
   border: "1px solid #D1D5DB",
@@ -770,27 +771,37 @@ const searchTdStyle = {
   padding: "12px 12px",
   borderBottom: "1px solid #EEF2F7",
   verticalAlign: "top",
-  color: "#222",
-  lineHeight: 1.4,
+  color: "#374151",
+  lineHeight: 1.5,
+  fontSize: 14,
+  fontFamily: "inherit"
+};
+
+const brandCellStyle = {
+  ...searchTdStyle,
+  color: "#4B5563",
+  fontWeight: 500,
+  whiteSpace: "normal",
+  overflowWrap: "anywhere",
+  wordBreak: "break-word"
 };
 
 const pnCellStyle = {
   ...searchTdStyle,
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-  fontSize: 12,
-  color: "#374151",
+  color: "#4B5563",
+  fontWeight: 500,
   whiteSpace: "normal",
   overflowWrap: "anywhere",
-  wordBreak: "break-word",
+  wordBreak: "break-word"
 };
 
 const nameCellStyle = {
   ...searchTdStyle,
-  fontWeight: 500,
   color: "#1F2937",
+  fontWeight: 500,
   whiteSpace: "normal",
   overflowWrap: "anywhere",
-  wordBreak: "break-word",
+  wordBreak: "break-word"
 };
 
 const qtyCellStyle = {
