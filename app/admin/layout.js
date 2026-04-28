@@ -1,69 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabaseClient";
+import { useAuthState } from "../../components/AuthProvider";
 import AdminSidebar from "../../components/AdminSidebar";
 
 export default function AdminLayout({ children }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [allowed, setAllowed] = useState(false);
+  const { authReady, user, isAdmin } = useAuthState();
 
   useEffect(() => {
-    let mounted = true;
+    if (!authReady) return;
 
-    async function checkAdmin() {
-      try {
-        const {
-          data: { user },
-          error: userError
-        } = await supabase.auth.getUser();
-
-        if (userError || !user) {
-          router.replace("/login");
-          return;
-        }
-
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error(profileError);
-          router.replace("/");
-          return;
-        }
-
-        if (!mounted) return;
-
-        if (profile?.role === "admin") {
-          setAllowed(true);
-        } else {
-          router.replace("/");
-        }
-      } catch (e) {
-        console.error(e);
-        router.replace("/");
-      } finally {
-        if (mounted) setLoading(false);
-      }
+    if (!user) {
+      router.replace("/login");
+      return;
     }
 
-    checkAdmin();
+    if (!isAdmin) {
+      router.replace("/");
+    }
+  }, [authReady, user, isAdmin, router]);
 
-    return () => {
-      mounted = false;
-    };
-  }, [router]);
-
-  if (loading) {
+  if (!authReady) {
     return <div style={{ padding: 24 }}>Проверяю доступ к админке...</div>;
   }
 
-  if (!allowed) {
+  if (!user || !isAdmin) {
     return null;
   }
 
