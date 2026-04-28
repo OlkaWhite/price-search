@@ -37,7 +37,7 @@ export default function AdminUploadsPage() {
       const [suppliersRes, logsRes] = await Promise.all([
         supabase
           .from("pricelists")
-          .select("id, supplier, name, price_type")
+          .select("id, supplier, name, price_type, upload_hint")
           .order("id", { ascending: true }),
 
         supabase
@@ -88,6 +88,9 @@ export default function AdminUploadsPage() {
     return Object.fromEntries(suppliers.map((item) => [String(item.id), item]));
   }, [suppliers]);
 
+  const selectedSupplier = suppliersMap[String(supplierId)] || null;
+  const selectedUploadHint = selectedSupplier?.upload_hint || "";
+
   const isLargeFile = file ? file.size > LARGE_FILE_LIMIT_MB * 1024 * 1024 : false;
 
   function resetPreviewState() {
@@ -120,80 +123,79 @@ export default function AdminUploadsPage() {
   }
 
   async function handlePreview() {
-  if (!supplierId) {
-    setErrorText("Выбери поставщика.");
-    return;
-  }
-
-  if (!file) {
-    setErrorText("Выбери CSV/XLS/XLSX-файл.");
-    return;
-  }
-
-  if (isLargeFile) {
-    setErrorText(
-      "Файл слишком большой для обычной проверки. Используй кнопку «Загрузить большой файл без preview»."
-    );
-    return;
-  }
-
-  setPreviewLoading(true);
-  resetAllMessages();
-  resetPreviewState();
-
-  try {
-    const ruleData = await fetchImportRule(supplierId);
-    const parsed = await parseSourceFile(file, ruleData.rule);
-    const sourceRows = parsed.rows;
-    console.log("IMPORT DEBUG", parsed.debug);
-    
-
-    console.log("IMPORT DEBUG", {
-      supplierId,
-      rule: ruleData.rule,
-      debug: parsed.debug
-    });
-
-    const normalizedRows = normalizeRowsByRule(
-      sourceRows,
-      ruleData.rule,
-      ruleData.aliases
-    );
-
-    const rowsTotal = normalizedRows.length;
-    const rowsWithoutPn = normalizedRows.filter((r) => !r.pn).length;
-    const rowsEmptyBrand = normalizedRows.filter((r) => !r.brand).length;
-    const rowsEmptyName = normalizedRows.filter((r) => !r.name).length;
-    const rowsReady = rowsTotal - rowsWithoutPn;
-
-    setPreviewStats({
-      rowsTotal,
-      rowsWithoutPn,
-      rowsEmptyBrand,
-      rowsEmptyName,
-      rowsReady
-    });
-
-    setPreviewRows(normalizedRows.slice(0, 20));
-    setPreviewReady(true);
-    setMessage("Файл нормализован по правилу поставщика. Можно загружать прайс.");
-
-    await postJson("/api/admin/uploads/append", { action: "reset" });
-
-    for (let i = 0; i < normalizedRows.length; i += BIG_UPLOAD_CHUNK) {
-      const chunk = normalizedRows.slice(i, i + BIG_UPLOAD_CHUNK);
-      await postJson("/api/admin/uploads/append", {
-        action: "append",
-        rows: chunk
-      });
+    if (!supplierId) {
+      setErrorText("Выбери поставщика.");
+      return;
     }
-  } catch (err) {
-    console.error("Preview error:", err);
-    setErrorText(err?.message || "Ошибка проверки файла.");
-  } finally {
-    setPreviewLoading(false);
+
+    if (!file) {
+      setErrorText("Выбери CSV/XLS/XLSX-файл.");
+      return;
+    }
+
+    if (isLargeFile) {
+      setErrorText(
+        "Файл слишком большой для обычной проверки. Используй кнопку «Загрузить большой файл без preview»."
+      );
+      return;
+    }
+
+    setPreviewLoading(true);
+    resetAllMessages();
+    resetPreviewState();
+
+    try {
+      const ruleData = await fetchImportRule(supplierId);
+      const parsed = await parseSourceFile(file, ruleData.rule);
+      const sourceRows = parsed.rows;
+
+      console.log("IMPORT DEBUG", parsed.debug);
+      console.log("IMPORT DEBUG", {
+        supplierId,
+        rule: ruleData.rule,
+        debug: parsed.debug
+      });
+
+      const normalizedRows = normalizeRowsByRule(
+        sourceRows,
+        ruleData.rule,
+        ruleData.aliases
+      );
+
+      const rowsTotal = normalizedRows.length;
+      const rowsWithoutPn = normalizedRows.filter((r) => !r.pn).length;
+      const rowsEmptyBrand = normalizedRows.filter((r) => !r.brand).length;
+      const rowsEmptyName = normalizedRows.filter((r) => !r.name).length;
+      const rowsReady = rowsTotal - rowsWithoutPn;
+
+      setPreviewStats({
+        rowsTotal,
+        rowsWithoutPn,
+        rowsEmptyBrand,
+        rowsEmptyName,
+        rowsReady
+      });
+
+      setPreviewRows(normalizedRows.slice(0, 20));
+      setPreviewReady(true);
+      setMessage("Файл нормализован по правилу поставщика. Можно загружать прайс.");
+
+      await postJson("/api/admin/uploads/append", { action: "reset" });
+
+      for (let i = 0; i < normalizedRows.length; i += BIG_UPLOAD_CHUNK) {
+        const chunk = normalizedRows.slice(i, i + BIG_UPLOAD_CHUNK);
+        await postJson("/api/admin/uploads/append", {
+          action: "append",
+          rows: chunk
+        });
+      }
+    } catch (err) {
+      console.error("Preview error:", err);
+      setErrorText(err?.message || "Ошибка проверки файла.");
+    } finally {
+      setPreviewLoading(false);
+    }
   }
-}
 
   async function handleCommit() {
     if (!supplierId) {
@@ -273,7 +275,10 @@ export default function AdminUploadsPage() {
 
       setMessage("Читаю исходный файл...");
 
-      const sourceRows = await parseSourceFile(file, ruleData.rule);
+      const parsed = await parseSourceFile(file, ruleData.rule);
+      const sourceRows = parsed.rows;
+
+      console.log("IMPORT DEBUG", parsed.debug);
 
       if (!sourceRows.length) {
         throw new Error("Файл пустой или не удалось прочитать строки.");
@@ -440,6 +445,26 @@ export default function AdminUploadsPage() {
                 </select>
               </Field>
 
+              {selectedUploadHint && (
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    background: "#fff8e7",
+                    border: "1px solid #f3d9a4",
+                    color: "#7a4b00",
+                    fontSize: 14,
+                    lineHeight: 1.5,
+                    whiteSpace: "pre-wrap"
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                    Подсказка по загрузке этого поставщика
+                  </div>
+                  {selectedUploadHint}
+                </div>
+              )}
+
               <Field label="Тип прайса">
                 <select
                   value={priceType}
@@ -455,7 +480,7 @@ export default function AdminUploadsPage() {
                 <input
                   id="csv-upload-input"
                   type="file"
-                  accept=".csv,.xls,.xlsx,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  accept=".csv,.xls,.xlsx,.xlsm,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   onChange={(e) => {
                     const nextFile = e.target.files?.[0] || null;
                     setFile(nextFile);
@@ -828,12 +853,10 @@ function matrixToObjects(matrix, rule) {
     const row = Array.isArray(matrix[i]) ? matrix[i] : [];
     const obj = {};
 
-    // Индексные колонки создаём ВСЕГДА
     for (let col = 0; col < maxColumns; col += 1) {
       obj[`__col_${col + 1}`] = row[col] ?? "";
     }
 
-    // Именованные заголовки создаём только если они есть
     for (let col = 0; col < headers.length; col += 1) {
       const header = String(headers[col] ?? "").trim();
       if (header) {
@@ -1059,13 +1082,11 @@ function normalizeQtyValue(value, rule = {}) {
 
   if (!s) return "";
 
-  // Больше 30 -> >30
   const moreMatch = s.match(/^больше\s+(.+)$/i);
   if (moreMatch) {
     return `>${String(moreMatch[1] || "").trim()}`;
   }
 
-  // 6,00 -> 6  (только если включено в правиле)
   if (rule.qty_trim_zero_decimals) {
     const normalized = s.replace(",", ".");
     const num = Number(normalized);
@@ -1089,14 +1110,9 @@ function normalizePriceValue(value, trim = true, replaceComma = true) {
 
   if (!s) return "";
 
-  // убираем обычные и неразрывные пробелы
   s = s.replace(/\u00A0/g, "").replace(/\s+/g, "");
-
-  // убираем валютные символы и лишний мусор по краям
   s = s.replace(/\$/g, "").replace(/₽/g, "");
 
-  // Если есть и точка, и запятая:
-  // 58.812,24 -> 58812.24
   if (s.includes(".") && s.includes(",")) {
     if (s.lastIndexOf(",") > s.lastIndexOf(".")) {
       s = s.replace(/\./g, "");
@@ -1107,16 +1123,14 @@ function normalizePriceValue(value, trim = true, replaceComma = true) {
     return s;
   }
 
-  // Только запятая:
-  // 58812,24 -> 58812.24
   if (replaceComma && s.includes(",")) {
     s = s.replace(",", ".");
     return s;
   }
 
-  // Только точки — оставляем как есть
   return s;
 }
+
 function getFileExtension(fileName = "") {
   const parts = String(fileName).toLowerCase().split(".");
   return parts.length > 1 ? parts.pop() : "";
