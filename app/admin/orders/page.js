@@ -34,6 +34,38 @@ function formatPriceDisplay(price) {
   return `${value.toFixed(2)} BYN`;
 }
 
+function normalizeLoadedItem(item) {
+  return {
+    ...item,
+    order_qty: Number(item.order_qty) || 1,
+    price_byn: Number(item.price_byn) || 0,
+    requested_price_byn:
+      item.requested_price_byn === null || item.requested_price_byn === undefined
+        ? null
+        : Number(item.requested_price_byn) || 0,
+    display_price: item.display_price || formatPriceDisplay(item.price_byn)
+  };
+}
+
+function normalizeItemsForCompare(items = []) {
+  return items.map((item) => ({
+    id: item.isNew ? null : item.id,
+    brand: item.brand || "",
+    pn: item.pn || "",
+    name: item.name || "",
+    order_qty: Math.max(1, Number(item.order_qty) || 1),
+    price_byn: Number(item.price_byn) || 0,
+    requested_price_byn:
+      item.requested_price_byn === null || item.requested_price_byn === ""
+        ? null
+        : Number(item.requested_price_byn) || 0
+  }));
+}
+
+function areItemsEqual(a = [], b = []) {
+  return JSON.stringify(normalizeItemsForCompare(a)) === JSON.stringify(normalizeItemsForCompare(b));
+}
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -41,10 +73,16 @@ export default function AdminOrdersPage() {
   const [errorText, setErrorText] = useState("");
   const [message, setMessage] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [originalSelectedOrder, setOriginalSelectedOrder] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  async function loadOrders() {
-    setLoading(true);
+  async function loadOrders(options = {}) {
+    const { silent = false, syncSelectedId = null } = options;
+
+    if (!silent) {
+      setLoading(true);
+    }
+
     setErrorText("");
 
     try {
@@ -105,31 +143,37 @@ export default function AdminOrdersPage() {
 
       const enrichedOrders = (ordersData || []).map((order) => ({
         ...order,
-        order_items: (order.order_items || []).map((item) => ({
-          ...item,
-          order_qty: Number(item.order_qty) || 1,
-          price_byn: Number(item.price_byn) || 0,
-          requested_price_byn:
-            item.requested_price_byn === null || item.requested_price_byn === undefined
-              ? null
-              : Number(item.requested_price_byn) || 0,
-          display_price: item.display_price || formatPriceDisplay(item.price_byn)
-        })),
+        order_items: (order.order_items || []).map(normalizeLoadedItem),
         profile: profilesMap[order.user_id] || null
       }));
 
       setOrders(enrichedOrders);
 
-      if (selectedOrder) {
-        const fresh = enrichedOrders.find((o) => o.id === selectedOrder.id);
-        setSelectedOrder(fresh || null);
+      if (syncSelectedId) {
+        const fresh = enrichedOrders.find((o) => o.id === syncSelectedId);
+        const normalizedFresh = fresh
+          ? {
+              ...fresh,
+              order_items: (fresh.order_items || []).map(normalizeLoadedItem)
+            }
+          : null;
+
+        setSelectedOrder(normalizedFresh);
+        setOriginalSelectedOrder(
+          normalizedFresh ? JSON.parse(JSON.stringify(normalizedFresh)) : null
+        );
       }
     } catch (err) {
       console.error("Admin orders load error:", err);
       setErrorText(err?.message || "Не удалось загрузить заказы.");
-      setOrders([]);
+
+      if (!silent) {
+        setOrders([]);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }
 
@@ -157,21 +201,21 @@ export default function AdminOrdersPage() {
   }, [orders]);
 
   function openOrder(order) {
+    const normalizedOrder = {
+      ...order,
+      order_items: (order.order_items || []).map(normalizeLoadedItem)
+    };
+
     setErrorText("");
     setMessage("");
-    setSelectedOrder({
-      ...order,
-      order_items: (order.order_items || []).map((item) => ({
-        ...item,
-        order_qty: Number(item.order_qty) || 1,
-        price_byn: Number(item.price_byn) || 0,
-        requested_price_byn:
-          item.requested_price_byn === null || item.requested_price_byn === undefined
-            ? null
-            : Number(item.requested_price_byn) || 0,
-        display_price: item.display_price || formatPriceDisplay(item.price_byn)
-      }))
-    });
+    setSelectedOrder(normalizedOrder);
+    setOriginalSelectedOrder(JSON.parse(JSON.stringify(normalizedOrder)));
+  }
+
+  function closeOrder() {
+    if (saving) return;
+    setSelectedOrder(null);
+    setOriginalSelectedOrder(null);
   }
 
   function updateSelectedOrderField(field, value) {
@@ -226,6 +270,8 @@ export default function AdminOrdersPage() {
   async function saveOrderUpdates() {
     if (!selectedOrder) return;
 
+    const orderId = selectedOrder.id;
+
     setSaving(true);
     setErrorText("");
     setMessage("");
@@ -249,84 +295,92 @@ export default function AdminOrdersPage() {
       const { error: orderError } = await supabase
         .from("orders")
         .update(payload)
-        .eq("id", selectedOrder.id);
+        .eq("id", orderId);
 
       if (orderError) throw orderError;
 
-      const existingItems = (selectedOrder.order_items || []).filter((item) => !item.isNew);
-      const newItems = (selectedOrder.order_items || []).filter((item) => item.isNew);
+      const itemsChanged = !areItemsEqual(
+        selectedOrder.order_items || [],
+        originalSelectedOrder?.order_items || []
+      );
 
-      const { data: dbItems, error: dbReadError } = await supabase
-        .from("order_items")
-        .select("id")
-        .eq("order_id", selectedOrder.id);
+      if (itemsChanged) {
+        const existingItems = (selectedOrder.order_items || []).filter((item) => !item.isNew);
+        const newItems = (selectedOrder.order_items || []).filter((item) => item.isNew);
 
-      if (dbReadError) throw dbReadError;
-
-      const dbIds = (dbItems || []).map((x) => x.id);
-      const currentExistingIds = existingItems.map((x) => x.id);
-      const idsToDelete = dbIds.filter((id) => !currentExistingIds.includes(id));
-
-      for (const item of existingItems) {
-        const normalizedPrice = Number(item.price_byn) || 0;
-        const normalizedQty = Math.max(1, Number(item.order_qty) || 1);
-
-        const { error } = await supabase
+        const { data: dbItems, error: dbReadError } = await supabase
           .from("order_items")
-          .update({
-            brand: item.brand || null,
-            pn: item.pn || null,
-            name: item.name || null,
-            order_qty: normalizedQty,
-            price_byn: normalizedPrice,
-            display_price: formatPriceDisplay(normalizedPrice),
-            requested_price_byn:
-              item.requested_price_byn === null || item.requested_price_byn === ""
-                ? null
-                : Number(item.requested_price_byn) || 0
-          })
-          .eq("id", item.id)
-          .eq("order_id", selectedOrder.id);
+          .select("id")
+          .eq("order_id", orderId);
 
-        if (error) throw error;
-      }
+        if (dbReadError) throw dbReadError;
 
-      if (newItems.length > 0) {
-        const insertPayload = newItems.map((item) => {
+        const dbIds = (dbItems || []).map((x) => x.id);
+        const currentExistingIds = existingItems.map((x) => x.id);
+        const idsToDelete = dbIds.filter((id) => !currentExistingIds.includes(id));
+
+        for (const item of existingItems) {
           const normalizedPrice = Number(item.price_byn) || 0;
           const normalizedQty = Math.max(1, Number(item.order_qty) || 1);
 
-          return {
-            order_id: selectedOrder.id,
-            brand: item.brand || null,
-            pn: item.pn || null,
-            name: item.name || null,
-            order_qty: normalizedQty,
-            stock_qty: item.stock_qty || null,
-            price_byn: normalizedPrice,
-            display_price: formatPriceDisplay(normalizedPrice),
-            requested_price_byn:
-              item.requested_price_byn === null || item.requested_price_byn === ""
-                ? null
-                : Number(item.requested_price_byn) || 0
-          };
-        });
+          const { error } = await supabase
+            .from("order_items")
+            .update({
+              brand: item.brand || null,
+              pn: item.pn || null,
+              name: item.name || null,
+              order_qty: normalizedQty,
+              price_byn: normalizedPrice,
+              display_price: formatPriceDisplay(normalizedPrice),
+              requested_price_byn:
+                item.requested_price_byn === null || item.requested_price_byn === ""
+                  ? null
+                  : Number(item.requested_price_byn) || 0
+            })
+            .eq("id", item.id)
+            .eq("order_id", orderId);
 
-        const { error } = await supabase.from("order_items").insert(insertPayload);
-        if (error) throw error;
-      }
+          if (error) throw error;
+        }
 
-      if (idsToDelete.length > 0) {
-        const { error } = await supabase
-          .from("order_items")
-          .delete()
-          .in("id", idsToDelete);
+        if (newItems.length > 0) {
+          const insertPayload = newItems.map((item) => {
+            const normalizedPrice = Number(item.price_byn) || 0;
+            const normalizedQty = Math.max(1, Number(item.order_qty) || 1);
 
-        if (error) throw error;
+            return {
+              order_id: orderId,
+              brand: item.brand || null,
+              pn: item.pn || null,
+              name: item.name || null,
+              order_qty: normalizedQty,
+              stock_qty: item.stock_qty || null,
+              price_byn: normalizedPrice,
+              display_price: formatPriceDisplay(normalizedPrice),
+              requested_price_byn:
+                item.requested_price_byn === null || item.requested_price_byn === ""
+                  ? null
+                  : Number(item.requested_price_byn) || 0
+            };
+          });
+
+          const { error } = await supabase.from("order_items").insert(insertPayload);
+          if (error) throw error;
+        }
+
+        if (idsToDelete.length > 0) {
+          const { error } = await supabase
+            .from("order_items")
+            .delete()
+            .in("id", idsToDelete);
+
+          if (error) throw error;
+        }
       }
 
       const normalizedSelectedOrder = {
         ...selectedOrder,
+        id: orderId,
         status: normalizedStatus,
         manager_comment: normalizedManagerComment,
         invoice_url: normalizedInvoiceUrl,
@@ -348,23 +402,26 @@ export default function AdminOrdersPage() {
       };
 
       setOrders((prev) => {
-        const next = prev.map((order) =>
-          order.id === normalizedSelectedOrder.id ? normalizedSelectedOrder : order
+        let next = prev.map((order) =>
+          order.id === orderId ? normalizedSelectedOrder : order
         );
 
-        if (statusFilter === "all" || normalizedSelectedOrder.status === statusFilter) {
-          return next;
+        if (statusFilter !== "all" && normalizedSelectedOrder.status !== statusFilter) {
+          next = next.filter((order) => order.id !== orderId);
         }
 
-        return next.filter((order) => order.id !== normalizedSelectedOrder.id);
+        return next;
       });
 
       setSelectedOrder(null);
-      setMessage(`Заказ #${selectedOrder.id} обновлён.`);
+      setOriginalSelectedOrder(null);
+      setMessage(`Заказ #${orderId} обновлён.`);
 
-      loadOrders().catch((err) => {
-        console.error("Background reload after save failed:", err);
-      });
+      setTimeout(() => {
+        loadOrders({ silent: true }).catch((err) => {
+          console.error("Background refresh error:", err);
+        });
+      }, 0);
     } catch (error) {
       console.error("saveOrderUpdates error:", error);
       setErrorText("Ошибка при сохранении: " + (error?.message || "неизвестная ошибка"));
@@ -401,6 +458,7 @@ export default function AdminOrdersPage() {
 
       setOrders((prev) => prev.filter((order) => order.id !== orderId));
       setSelectedOrder(null);
+      setOriginalSelectedOrder(null);
       setMessage(`Заказ #${orderId} удалён.`);
     } catch (error) {
       console.error("handleDeleteOrder error:", error);
@@ -447,7 +505,7 @@ export default function AdminOrdersPage() {
             ))}
           </select>
 
-          <button onClick={loadOrders} style={mainButtonStyle}>
+          <button onClick={() => loadOrders()} style={mainButtonStyle}>
             Обновить
           </button>
         </div>
@@ -552,7 +610,9 @@ export default function AdminOrdersPage() {
                   return (
                     <tr key={order.id}>
                       <td style={tdStyle}>{order.id}</td>
-                      <td style={tdStyle}>{new Date(order.created_at).toLocaleString()}</td>
+                      <td style={tdStyle}>
+                        {new Date(order.created_at).toLocaleString()}
+                      </td>
                       <td style={tdStyle}>
                         <div style={{ fontWeight: 600 }}>
                           {order.customer_name || "—"}
@@ -603,7 +663,7 @@ export default function AdminOrdersPage() {
 
       {selectedOrder && (
         <div
-          onClick={() => !saving && setSelectedOrder(null)}
+          onClick={closeOrder}
           style={{
             position: "fixed",
             inset: 0,
@@ -642,7 +702,7 @@ export default function AdminOrdersPage() {
               <h2 style={{ margin: 0 }}>Заказ #{selectedOrder.id}</h2>
 
               <button
-                onClick={() => !saving && setSelectedOrder(null)}
+                onClick={closeOrder}
                 style={smallGhostButtonStyle}
                 disabled={saving}
               >
@@ -899,7 +959,9 @@ export default function AdminOrdersPage() {
                         >
                           <input
                             value={item.brand || ""}
-                            onChange={(e) => updateOrderItem(item.id, "brand", e.target.value)}
+                            onChange={(e) =>
+                              updateOrderItem(item.id, "brand", e.target.value)
+                            }
                             style={cellInputStyle}
                             placeholder="Бренд"
                             disabled={saving}
@@ -907,7 +969,9 @@ export default function AdminOrdersPage() {
 
                           <input
                             value={item.pn || ""}
-                            onChange={(e) => updateOrderItem(item.id, "pn", e.target.value)}
+                            onChange={(e) =>
+                              updateOrderItem(item.id, "pn", e.target.value)
+                            }
                             style={cellInputStyle}
                             placeholder="P/N"
                             disabled={saving}
@@ -915,7 +979,9 @@ export default function AdminOrdersPage() {
 
                           <input
                             value={item.name || ""}
-                            onChange={(e) => updateOrderItem(item.id, "name", e.target.value)}
+                            onChange={(e) =>
+                              updateOrderItem(item.id, "name", e.target.value)
+                            }
                             style={cellInputStyle}
                             placeholder="Наименование"
                             disabled={saving}
@@ -925,7 +991,9 @@ export default function AdminOrdersPage() {
                             type="number"
                             min="1"
                             value={item.order_qty}
-                            onChange={(e) => updateOrderItem(item.id, "order_qty", e.target.value)}
+                            onChange={(e) =>
+                              updateOrderItem(item.id, "order_qty", e.target.value)
+                            }
                             style={cellInputStyle}
                             disabled={saving}
                           />
@@ -935,12 +1003,16 @@ export default function AdminOrdersPage() {
                             min="0"
                             step="0.01"
                             value={item.price_byn}
-                            onChange={(e) => updateOrderItem(item.id, "price_byn", e.target.value)}
+                            onChange={(e) =>
+                              updateOrderItem(item.id, "price_byn", e.target.value)
+                            }
                             style={cellInputStyle}
                             disabled={saving}
                           />
 
-                          <div style={itemCellStyle}>{calcItemTotal(item).toFixed(2)} BYN</div>
+                          <div style={itemCellStyle}>
+                            {calcItemTotal(item).toFixed(2)} BYN
+                          </div>
 
                           <div style={itemCellStyle}>
                             {item.requested_price_byn !== null &&
