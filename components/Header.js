@@ -116,6 +116,22 @@ export default function Header() {
             Поиск по прайсам
           </Link>
 
+          <Link
+            href="/account"
+            style={{
+              padding: "10px 12px",
+              border: "1px solid #ccc",
+              borderRadius: 10,
+              textDecoration: "none",
+              color: "#111",
+              background: isActive("/account") ? "#f3f3f3" : "#fff",
+              fontSize: 14,
+              whiteSpace: "nowrap"
+            }}
+          >
+            Личный кабинет
+          </Link>
+
           {authReady && isAdmin && (
             <Link
               href="/admin"
@@ -133,25 +149,6 @@ export default function Header() {
               Админка
             </Link>
           )}
-
-          {/*
-          Если потом решишь вернуть личный кабинет/логин, используй уже authReady, user и isAdmin из useAuthState()
-
-          <Link
-            href="/account"
-            style={{
-              padding: "10px 12px",
-              border: "1px solid #ccc",
-              borderRadius: 10,
-              textDecoration: "none",
-              color: "#111",
-              background: isActive("/account") ? "#f3f3f3" : "#fff",
-              fontSize: 14,
-              whiteSpace: "nowrap"
-            }}
-          >
-            Личный кабинет
-          </Link>
 
           {authReady && !user && (
             <Link
@@ -204,7 +201,6 @@ export default function Header() {
               </button>
             </>
           )}
-          */}
         </div>
       </div>
     </header>
