@@ -11,6 +11,7 @@ export default function AdminSuppliersPage() {
   const [errorText, setErrorText] = useState("");
   const [message, setMessage] = useState("");
   const [deletingPrice, setDeletingPrice] = useState(false);
+  const [uploadHint, setUploadHint] = useState("");
 
   async function loadSuppliers() {
     setLoading(true);
@@ -31,7 +32,8 @@ export default function AdminSuppliersPage() {
         markup_pct,
         rub_discount_pct,
         usd_discount_pct,
-        last_upload_at
+        last_upload_at,
+        upload_hint
       `)
       .order("id", { ascending: true });
 
@@ -40,9 +42,11 @@ export default function AdminSuppliersPage() {
       setSuppliers([]);
     } else {
       setSuppliers(data || []);
+
       if (selectedSupplier) {
         const fresh = (data || []).find((x) => x.id === selectedSupplier.id);
         setSelectedSupplier(fresh || null);
+        setUploadHint(fresh?.upload_hint || "");
       }
     }
 
@@ -89,7 +93,8 @@ export default function AdminSuppliersPage() {
         selectedSupplier.usd_discount_pct === "" ||
         selectedSupplier.usd_discount_pct === null
           ? null
-          : Number(selectedSupplier.usd_discount_pct)
+          : Number(selectedSupplier.usd_discount_pct),
+      upload_hint: uploadHint || null
     };
 
     const { data, error } = await supabase
@@ -108,7 +113,8 @@ export default function AdminSuppliersPage() {
         markup_pct,
         rub_discount_pct,
         usd_discount_pct,
-        last_upload_at
+        last_upload_at,
+        upload_hint
       `)
       .single();
 
@@ -118,6 +124,7 @@ export default function AdminSuppliersPage() {
     } else {
       setMessage(`Поставщик #${selectedSupplier.id} сохранён.`);
       setSelectedSupplier(data);
+      setUploadHint(data?.upload_hint || "");
 
       setSuppliers((prev) =>
         prev.map((item) => (item.id === data.id ? data : item))
@@ -128,58 +135,57 @@ export default function AdminSuppliersPage() {
   }
 
   async function handleDeletePrice() {
-  if (!selectedSupplier) return;
+    if (!selectedSupplier) return;
 
-  const confirmText = `Удалить текущий прайс поставщика #${selectedSupplier.id} — ${selectedSupplier.supplier || "—"} / ${selectedSupplier.name || "—"}?`;
-  const confirmed = window.confirm(confirmText);
+    const confirmText = `Удалить текущий прайс поставщика #${selectedSupplier.id} — ${selectedSupplier.supplier || "—"} / ${selectedSupplier.name || "—"}?`;
+    const confirmed = window.confirm(confirmText);
 
-  if (!confirmed) return;
+    if (!confirmed) return;
 
-  setDeletingPrice(true);
-  setErrorText("");
-  setMessage("");
+    setDeletingPrice(true);
+    setErrorText("");
+    setMessage("");
 
-  try {
-    const res = await fetch("/api/admin/suppliers/delete-price", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        supplierId: selectedSupplier.id
-      })
-    });
-
-    const rawText = await res.text();
-
-    let data = null;
     try {
-      data = rawText ? JSON.parse(rawText) : null;
-    } catch {
-      throw new Error(rawText || "Сервер вернул невалидный ответ.");
+      const res = await fetch("/api/admin/suppliers/delete-price", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          supplierId: selectedSupplier.id
+        })
+      });
+
+      const rawText = await res.text();
+
+      let data = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        throw new Error(rawText || "Сервер вернул невалидный ответ.");
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Не удалось удалить прайс.");
+      }
+
+      setMessage(
+        `Прайс поставщика удалён. Удалено строк: ${data?.deletedRows ?? 0}.`
+      );
+
+      if (data?.warning) {
+        setErrorText(data.warning);
+      }
+
+      await loadSuppliers();
+    } catch (err) {
+      console.error("Delete supplier price error:", err);
+      setErrorText(err?.message || "Не удалось удалить прайс поставщика.");
+    } finally {
+      setDeletingPrice(false);
     }
-
-    if (!res.ok) {
-      throw new Error(data?.error || "Не удалось удалить прайс.");
-    }
-
-    setMessage(
-      `Прайс поставщика удалён. Удалено строк: ${data?.deletedRows ?? 0}.`
-    );
-
-    if (data?.warning) {
-      setErrorText(data.warning);
-    }
-
-    await loadSuppliers();
-  } catch (err) {
-    console.error("Delete supplier price error:", err);
-    setErrorText(err?.message || "Не удалось удалить прайс поставщика.");
-  } finally {
-    setDeletingPrice(false);
   }
-}
-
 
   function updateField(field, value) {
     setSelectedSupplier((prev) => ({
@@ -311,7 +317,10 @@ export default function AdminSuppliersPage() {
                         <td style={tdStyle}>{formatDateTime(item.last_upload_at)}</td>
                         <td style={tdStyle}>
                           <button
-                            onClick={() => setSelectedSupplier(item)}
+                            onClick={() => {
+                              setSelectedSupplier(item);
+                              setUploadHint(item.upload_hint || "");
+                            }}
                             style={smallButtonStyle}
                           >
                             Открыть
@@ -348,7 +357,10 @@ export default function AdminSuppliersPage() {
               <h2 style={{ margin: 0 }}>Поставщик #{selectedSupplier.id}</h2>
 
               <button
-                onClick={() => setSelectedSupplier(null)}
+                onClick={() => {
+                  setSelectedSupplier(null);
+                  setUploadHint("");
+                }}
                 style={smallGhostButtonStyle}
               >
                 Закрыть
@@ -449,49 +461,68 @@ export default function AdminSuppliersPage() {
                   {formatDateTime(selectedSupplier.last_upload_at)}
                 </div>
               </Field>
+
+              <Field label="Подсказка по загрузке прайса">
+                <textarea
+                  value={uploadHint}
+                  onChange={(e) => setUploadHint(e.target.value)}
+                  rows={6}
+                  placeholder="Например: скачать прайс с сайта, удалить верхние строки, проверить валюту, не грузить call..."
+                  style={{
+                    width: "100%",
+                    minHeight: 120,
+                    padding: "10px 12px",
+                    border: "1px solid #ccc",
+                    borderRadius: 10,
+                    fontSize: 14,
+                    boxSizing: "border-box",
+                    resize: "vertical"
+                  }}
+                />
+              </Field>
             </div>
 
             <div
-  style={{
-    marginTop: 20,
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap"
-  }}
->
-  <button
-    onClick={handleSave}
-    disabled={saving || deletingPrice}
-    style={{
-      padding: "12px 14px",
-      borderRadius: 10,
-      border: "1px solid #111",
-      background: saving || deletingPrice ? "#ddd" : "#111",
-      color: saving || deletingPrice ? "#333" : "#fff",
-      cursor: saving || deletingPrice ? "default" : "pointer",
-      fontSize: 14
-    }}
-  >
-    {saving ? "Сохраняю..." : "Сохранить"}
-  </button>
+              style={{
+                marginTop: 20,
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap"
+              }}
+            >
+              <button
+                onClick={handleSave}
+                disabled={saving || deletingPrice}
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  border: "1px solid #111",
+                  background: saving || deletingPrice ? "#ddd" : "#111",
+                  color: saving || deletingPrice ? "#333" : "#fff",
+                  cursor: saving || deletingPrice ? "default" : "pointer",
+                  fontSize: 14
+                }}
+              >
+                {saving ? "Сохраняю..." : "Сохранить"}
+              </button>
 
-  <button
-    onClick={handleDeletePrice}
-    disabled={saving || deletingPrice}
-    style={{
-      padding: "12px 14px",
-      borderRadius: 10,
-      border: "1px solid #b91c1c",
-      background: deletingPrice ? "#f3f4f6" : "#fff",
-      color: "#b91c1c",
-      cursor: saving || deletingPrice ? "default" : "pointer",
-      fontSize: 14,
-      fontWeight: 600
-    }}
-  >
-    {deletingPrice ? "Удаляю прайс..." : "Удалить текущий прайс"}
-  </button>
-</div>
+              <button
+                onClick={handleDeletePrice}
+                disabled={saving || deletingPrice}
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  border: "1px solid #b91c1c",
+                  background: deletingPrice ? "#f3f4f6" : "#fff",
+                  color: "#b91c1c",
+                  cursor: saving || deletingPrice ? "default" : "pointer",
+                  fontSize: 14,
+                  fontWeight: 600
+                }}
+              >
+                {deletingPrice ? "Удаляю прайс..." : "Удалить текущий прайс"}
+              </button>
+            </div>
           </div>
         )}
       </div>
