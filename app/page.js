@@ -511,7 +511,7 @@ export default function Page() {
                   "P/N",
                   "Наименование",
                   "Кол-во",
-                  "Цена с НДС (BYN)",
+                  "BYN с НДС",
                   "Дата прайса",
                   ...(isAdmin ? ["Прайс"] : []),
                 ].map((h) => (
@@ -540,9 +540,7 @@ export default function Page() {
                   }}
                   style={{ transition: "background 0.15s ease" }}
                 >
-                  <td style={searchTdStyle}>
-                    <span style={brandBadgeStyle}>{r.brand || "—"}</span>
-                  </td>
+                  <td style={pnCellStyle}>{r.brand || "—"}</td>
 
                   <td style={pnCellStyle}>{r.pn || "—"}</td>
 
@@ -670,11 +668,12 @@ const searchControlsRowStyle = {
   alignItems: "center",
   marginTop: 18,
   flexWrap: "wrap",
+  justifyContent: "flex-start",
 };
 
 const searchInputStyle = {
-  flex: "1 1 460px",
-  minWidth: 280,
+  width: 400,
+  maxWidth: "100%",
   padding: "12px 14px",
   border: "1px solid #D1D5DB",
   borderRadius: 12,
@@ -814,13 +813,3 @@ const dateCellStyle = {
   whiteSpace: "nowrap",
 };
 
-const brandBadgeStyle = {
-  display: "inline-block",
-  padding: "4px 10px",
-  borderRadius: 999,
-  background: "#EEF2FF",
-  color: "#3559A8",
-  fontSize: 12,
-  fontWeight: 600,
-  lineHeight: 1.2,
-};
