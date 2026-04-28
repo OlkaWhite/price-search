@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { useAuthState } from "../components/AuthProvider";
 
 const PAGE_SIZE = 50;
 
 export default function Page() {
+  const { isAdmin, user } = useAuthState();
+
   const [query, setQuery] = useState("");
   const [brand, setBrand] = useState("ALL");
 
@@ -22,64 +25,7 @@ export default function Page() {
   const [hasMore, setHasMore] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
-  const [isAdmin, setIsAdmin] = useState(false);
-
   const lastLoggedSearchRef = useRef("");
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadUserProfile() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!mounted) return;
-
-      if (!session?.user) {
-        setIsAdmin(false);
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", session.user.id)
-        .maybeSingle();
-
-      if (!mounted) return;
-
-      setIsAdmin(profile?.role === "admin");
-    }
-
-    loadUserProfile();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
-
-      if (!session?.user) {
-        setIsAdmin(false);
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", session.user.id)
-        .maybeSingle();
-
-      if (!mounted) return;
-
-      setIsAdmin(profile?.role === "admin");
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -209,13 +155,9 @@ export default function Page() {
     lastLoggedSearchRef.current = signature;
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
       await supabase.from("search_logs").insert({
-        user_id: session?.user?.id || null,
-        email: session?.user?.email || null,
+        user_id: user?.id || null,
+        email: user?.email || null,
         query: (queryText || "").trim() || `[brand:${brandValue}]`,
         normalized_query: normalizedQuery || `[brand:${normalizedBrand}]`,
         results_count: Number(resultsCount) || 0,
@@ -495,14 +437,14 @@ export default function Page() {
         <div style={searchTableWrapStyle}>
           <table style={searchTableStyle}>
             <colgroup>
-  <col style={{ width: "130px" }} />
-  <col style={{ width: "170px" }} />
-  <col style={{ width: "auto" }} />
-  <col style={{ width: "90px" }} />
-  <col style={{ width: "140px" }} />
-  <col style={{ width: "120px" }} />
-  {isAdmin ? <col style={{ width: "180px" }} /> : null}
-</colgroup>
+              <col style={{ width: "120px" }} />
+              <col style={{ width: "170px" }} />
+              <col style={{ width: "auto" }} />
+              <col style={{ width: "90px" }} />
+              <col style={{ width: "140px" }} />
+              <col style={{ width: "120px" }} />
+              {isAdmin ? <col style={{ width: "180px" }} /> : null}
+            </colgroup>
 
             <thead>
               <tr>
@@ -541,16 +483,10 @@ export default function Page() {
                   style={{ transition: "background 0.15s ease" }}
                 >
                   <td style={brandCellStyle}>{r.brand || "—"}</td>
-
-
                   <td style={pnCellStyle}>{r.pn || "—"}</td>
-
                   <td style={nameCellStyle}>{r.name || "—"}</td>
-
                   <td style={qtyCellStyle}>{r.qty ?? "—"}</td>
-
                   <td style={priceCellStyle}>{getDisplayPrice(r)}</td>
-
                   <td style={dateCellStyle}>{formatUpdateDate(r.last_upload_at)}</td>
 
                   {isAdmin ? (
@@ -774,21 +710,21 @@ const searchTdStyle = {
   color: "#374151",
   lineHeight: 1.5,
   fontSize: 14,
-  fontFamily: "inherit"
+  fontFamily: "inherit",
 };
 
 const brandCellStyle = {
   ...searchTdStyle,
   color: "#4B5563",
   fontWeight: 500,
-  whiteSpace: "nowrap"
+  whiteSpace: "nowrap",
 };
 
 const pnCellStyle = {
   ...searchTdStyle,
   color: "#4B5563",
   fontWeight: 500,
-  whiteSpace: "nowrap"
+  whiteSpace: "nowrap",
 };
 
 const nameCellStyle = {
@@ -797,7 +733,7 @@ const nameCellStyle = {
   fontWeight: 500,
   whiteSpace: "normal",
   overflowWrap: "anywhere",
-  wordBreak: "break-word"
+  wordBreak: "break-word",
 };
 
 const qtyCellStyle = {
@@ -819,4 +755,3 @@ const dateCellStyle = {
   color: "#6B7280",
   whiteSpace: "nowrap",
 };
-

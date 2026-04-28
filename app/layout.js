@@ -1,5 +1,7 @@
 import "./globals.css";
 import Header from "../components/Header";
+import { AuthProvider } from "../components/AuthProvider";
+
 export const metadata = {
   title: "b2bpart.ru",
   description: "Поиск по прайсам"
@@ -16,8 +18,10 @@ export default function RootLayout({ children }) {
           color: "#111"
         }}
       >
-        <Header />
-        <main>{children}</main>
+        <AuthProvider>
+          <Header />
+          <main>{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );
