@@ -168,10 +168,7 @@ export default function Page() {
     const tokens = [];
 
     for (const token of rawTokens) {
-      // Отбрасываем совсем шумные токены,
-      // но оставляем числа и смешанные артикульные куски типа 1m, x5, g2.
-      const isUseful =
-        token.length >= 2 || /\d/.test(token);
+      const isUseful = token.length >= 2 || /\d/.test(token);
 
       if (!isUseful) continue;
       if (seen.has(token)) continue;
@@ -202,8 +199,9 @@ export default function Page() {
 
     const day = String(d.getDate()).padStart(2, "0");
     const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
 
-    return `${day}.${month}`;
+    return `${day}.${month}.${year}`;
   }
 
   async function logSearchAction({ queryText, brandValue, resultsCount }) {
@@ -273,8 +271,6 @@ export default function Page() {
   function buildBrandsQuery() {
     let req = supabase.from("offers_view").select("brand");
 
-    // Бренды грузим по текущему поисковому запросу,
-    // но НЕ режем по выбранному brand, чтобы в фильтре были все варианты
     req = applyTextSearch(req);
 
     return req;
@@ -403,10 +399,10 @@ export default function Page() {
 
   function getDisplayPrice(r) {
     if (typeof r.price_byn === "number") {
-      return `${r.price_byn.toLocaleString("ru-RU", {
+      return r.price_byn.toLocaleString("ru-RU", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      })} `;
+      });
     }
 
     if (r.price_rub && String(r.price_rub).trim() !== "") {
@@ -417,7 +413,7 @@ export default function Page() {
       return String(r.price_usd);
     }
 
-    return "";
+    return "—";
   }
 
   return (
@@ -514,161 +510,103 @@ export default function Page() {
       </div>
 
       <div style={{ marginTop: 16 }}>
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: 13,
-            tableLayout: "fixed",
-          }}
-        >
-          <colgroup>
-            <col style={{ width: "90px" }} />
-            <col style={{ width: "150px" }} />
-            <col style={{ width: "auto" }} />
-            <col style={{ width: "80px" }} />
-            <col style={{ width: "120px" }} />
-            <col style={{ width: "90px" }} />
-            {isAdmin ? <col style={{ width: "180px" }} /> : null}
-          </colgroup>
+        <div style={searchTableWrapStyle}>
+          <table
+            style={searchTableStyle}
+          >
+            <colgroup>
+              <col style={{ width: "90px" }} />
+              <col style={{ width: "150px" }} />
+              <col style={{ width: "auto" }} />
+              <col style={{ width: "80px" }} />
+              <col style={{ width: "120px" }} />
+              <col style={{ width: "120px" }} />
+              {isAdmin ? <col style={{ width: "180px" }} /> : null}
+            </colgroup>
 
-          <thead>
-            <tr>
-              {[
-                "Бренд",
-                "P/N",
-                "Наименование",
-                "Кол-во",
-                "Цена с НДС (BYN)",
-                "Дата прайса",
-                ...(isAdmin ? ["Прайс"] : []),
-              ].map((h) => (
-                <th
-                  key={h}
-                  style={{
-                    textAlign: "left",
-                    padding: "10px 8px",
-                    borderBottom: "2px solid #ddd",
-                    whiteSpace: h === "Наименование" ? "normal" : "nowrap",
-                    verticalAlign: "top",
-                  }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-
-          <tbody>
-            {rows.map((r, idx) => {
-              return (
-                <tr key={`${r.brand}-${r.pn}-${r.price_byn}-${idx}`}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      borderBottom: "1px solid #eee",
-                      whiteSpace: "nowrap",
-                      verticalAlign: "top",
-                    }}
-                  >
-                    {r.brand}
-                  </td>
-
-                  <td
-                    style={{
-                      padding: "8px",
-                      borderBottom: "1px solid #eee",
-                      whiteSpace: "normal",
-                      overflowWrap: "anywhere",
-                      wordBreak: "break-word",
-                      verticalAlign: "top",
-                    }}
-                  >
-                    {r.pn}
-                  </td>
-
-                  <td
-                    style={{
-                      padding: "8px",
-                      borderBottom: "1px solid #eee",
-                      whiteSpace: "normal",
-                      overflowWrap: "anywhere",
-                      wordBreak: "break-word",
-                      lineHeight: 1.35,
-                      verticalAlign: "top",
-                    }}
-                  >
-                    {r.name}
-                  </td>
-
-                  <td
-                    style={{
-                      padding: "8px",
-                      borderBottom: "1px solid #eee",
-                      whiteSpace: "nowrap",
-                      textAlign: "center",
-                      verticalAlign: "top",
-                    }}
-                  >
-                    {r.qty ?? ""}
-                  </td>
-
-                  <td
-                    style={{
-                      padding: "8px",
-                      borderBottom: "1px solid #eee",
-                      whiteSpace: "nowrap",
-                      verticalAlign: "top",
-                    }}
-                  >
-                    {getDisplayPrice(r)}
-                  </td>
-
-                  <td
-                    style={{
-                      padding: "8px",
-                      borderBottom: "1px solid #eee",
-                      whiteSpace: "nowrap",
-                      verticalAlign: "top",
-                    }}
-                  >
-                    {formatUpdateDate(r.last_upload_at)}
-                  </td>
-
-                  {isAdmin ? (
-                    <td
-                      style={{
-                        padding: "8px",
-                        borderBottom: "1px solid #eee",
-                        whiteSpace: "normal",
-                        verticalAlign: "top",
-                      }}
-                    >
-                      {r.pricelist_name || "—"}
-                    </td>
-                  ) : null}
-                </tr>
-              );
-            })}
-
-            {rows.length === 0 && (
+            <thead>
               <tr>
-                <td
-                  colSpan={6 + (isAdmin ? 1 : 0)}
-                  style={{ padding: "14px 8px", color: "#666" }}
-                >
-                  {canSearch
-                    ? loading
-                      ? "Идёт поиск..."
-                      : errorText
-                      ? errorText
-                      : "Ничего не найдено. Попробуйте ввести без символов - / \\"
-                    : "Начни вводить запрос (минимум 2 символа) или выбери бренд."}
-                </td>
+                {[
+                  "Бренд",
+                  "P/N",
+                  "Наименование",
+                  "Кол-во",
+                  "Цена с НДС (BYN)",
+                  "Дата прайса",
+                  ...(isAdmin ? ["Прайс"] : []),
+                ].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      ...searchThStyle,
+                      whiteSpace: h === "Наименование" ? "normal" : "nowrap",
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody>
+              {rows.map((r, idx) => {
+                return (
+                  <tr
+                    key={`${r.brand}-${r.pn}-${r.price_byn}-${idx}`}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#F8FAFF";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "";
+                    }}
+                    style={{ transition: "background 0.15s ease" }}
+                  >
+                    <td style={searchTdStyle}>
+                      <span style={brandBadgeStyle}>{r.brand || "—"}</span>
+                    </td>
+
+                    <td style={pnCellStyle}>{r.pn || "—"}</td>
+
+                    <td style={nameCellStyle}>{r.name || "—"}</td>
+
+                    <td style={qtyCellStyle}>{r.qty ?? "—"}</td>
+
+                    <td style={priceCellStyle}>{getDisplayPrice(r)}</td>
+
+                    <td style={dateCellStyle}>{formatUpdateDate(r.last_upload_at)}</td>
+
+                    {isAdmin ? (
+                      <td style={searchTdStyle}>
+                        {r.pricelist_name || "—"}
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
+
+              {rows.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={6 + (isAdmin ? 1 : 0)}
+                    style={{
+                      ...searchTdStyle,
+                      padding: "16px 12px",
+                      color: "#666",
+                    }}
+                  >
+                    {canSearch
+                      ? loading
+                        ? "Идёт поиск..."
+                        : errorText
+                        ? errorText
+                        : "Ничего не найдено. Попробуйте ввести без символов - / \\"
+                      : "Начни вводить запрос (минимум 2 символа) или выбери бренд."}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {rows.length > 0 && hasMore && (
@@ -721,3 +659,90 @@ export default function Page() {
     </div>
   );
 }
+
+const searchTableWrapStyle = {
+  overflowX: "auto",
+  border: "1px solid #E5E7EB",
+  borderRadius: 16,
+  background: "#fff",
+  boxShadow: "0 6px 20px rgba(15, 23, 42, 0.04)"
+};
+
+const searchTableStyle = {
+  width: "100%",
+  borderCollapse: "separate",
+  borderSpacing: 0,
+  fontSize: 13,
+  tableLayout: "fixed"
+};
+
+const searchThStyle = {
+  padding: "14px 12px",
+  textAlign: "left",
+  background: "#F5F7FA",
+  borderBottom: "1px solid #E2E8F0",
+  color: "#555",
+  fontSize: 12,
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: "0.4px",
+  verticalAlign: "top"
+};
+
+const searchTdStyle = {
+  padding: "12px 12px",
+  borderBottom: "1px solid #EEF2F7",
+  verticalAlign: "top",
+  color: "#222",
+  lineHeight: 1.4
+};
+
+const pnCellStyle = {
+  ...searchTdStyle,
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  fontSize: 12,
+  color: "#374151",
+  whiteSpace: "normal",
+  overflowWrap: "anywhere",
+  wordBreak: "break-word"
+};
+
+const nameCellStyle = {
+  ...searchTdStyle,
+  fontWeight: 500,
+  color: "#1F2937",
+  whiteSpace: "normal",
+  overflowWrap: "anywhere",
+  wordBreak: "break-word"
+};
+
+const qtyCellStyle = {
+  ...searchTdStyle,
+  whiteSpace: "nowrap",
+  textAlign: "center",
+  color: "#374151"
+};
+
+const priceCellStyle = {
+  ...searchTdStyle,
+  fontWeight: 600,
+  color: "#111827",
+  whiteSpace: "nowrap"
+};
+
+const dateCellStyle = {
+  ...searchTdStyle,
+  color: "#6B7280",
+  whiteSpace: "nowrap"
+};
+
+const brandBadgeStyle = {
+  display: "inline-block",
+  padding: "4px 10px",
+  borderRadius: 999,
+  background: "#EEF2FF",
+  color: "#3559A8",
+  fontSize: 12,
+  fontWeight: 600,
+  lineHeight: 1.2
+};
