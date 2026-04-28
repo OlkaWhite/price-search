@@ -495,14 +495,14 @@ export default function Page() {
         <div style={searchTableWrapStyle}>
           <table style={searchTableStyle}>
             <colgroup>
-              <col style={{ width: "90px" }} />
-              <col style={{ width: "150px" }} />
-              <col style={{ width: "auto" }} />
-              <col style={{ width: "80px" }} />
-              <col style={{ width: "120px" }} />
-              <col style={{ width: "120px" }} />
-              {isAdmin ? <col style={{ width: "180px" }} /> : null}
-            </colgroup>
+  <col style={{ width: "130px" }} />
+  <col style={{ width: "170px" }} />
+  <col style={{ width: "auto" }} />
+  <col style={{ width: "90px" }} />
+  <col style={{ width: "140px" }} />
+  <col style={{ width: "120px" }} />
+  {isAdmin ? <col style={{ width: "180px" }} /> : null}
+</colgroup>
 
             <thead>
               <tr>
@@ -781,18 +781,14 @@ const brandCellStyle = {
   ...searchTdStyle,
   color: "#4B5563",
   fontWeight: 500,
-  whiteSpace: "normal",
-  overflowWrap: "anywhere",
-  wordBreak: "break-word"
+  whiteSpace: "nowrap"
 };
 
 const pnCellStyle = {
   ...searchTdStyle,
   color: "#4B5563",
   fontWeight: 500,
-  whiteSpace: "normal",
-  overflowWrap: "anywhere",
-  wordBreak: "break-word"
+  whiteSpace: "nowrap"
 };
 
 const nameCellStyle = {
