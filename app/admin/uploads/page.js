@@ -28,36 +28,48 @@ export default function AdminUploadsPage() {
   const [previewRows, setPreviewRows] = useState([]);
   const [previewReady, setPreviewReady] = useState(false);
 
-  async function loadPageData() {
-    setLoading(true);
+  async function loadPageData(options = {}) {
+    const { silent = false, keepMessage = false } = options;
+
+    if (!silent) {
+      setLoading(true);
+    }
+
     setErrorText("");
-    setMessage("");
+
+    if (!keepMessage) {
+      setMessage("");
+    }
 
     try {
-      const [suppliersRes, logsRes] = await Promise.all([
-        supabase
-          .from("pricelists")
-          .select("id, supplier, name, price_type, upload_hint")
-          .order("id", { ascending: true }),
+      const [suppliersRes, logsRes] = await withTimeout(
+        Promise.all([
+          supabase
+            .from("pricelists")
+            .select("id, supplier, name, price_type, upload_hint")
+            .order("id", { ascending: true }),
 
-        supabase
-          .from("price_upload_logs")
-          .select(`
-            id,
-            supplier_id,
-            uploaded_by,
-            file_name,
-            price_type,
-            rows_total,
-            rows_inserted,
-            rows_skipped,
-            status,
-            error_text,
-            created_at
-          `)
-          .order("created_at", { ascending: false })
-          .limit(200)
-      ]);
+          supabase
+            .from("price_upload_logs")
+            .select(`
+              id,
+              supplier_id,
+              uploaded_by,
+              file_name,
+              price_type,
+              rows_total,
+              rows_inserted,
+              rows_skipped,
+              status,
+              error_text,
+              created_at
+            `)
+            .order("created_at", { ascending: false })
+            .limit(200)
+        ]),
+        15000,
+        "Страница не дождалась ответа от Supabase при обновлении истории загрузок."
+      );
 
       if (suppliersRes.error) throw suppliersRes.error;
       if (logsRes.error) throw logsRes.error;
@@ -74,14 +86,20 @@ export default function AdminUploadsPage() {
       }
     } catch (err) {
       console.error("Uploads page load error:", err);
-      setErrorText(err?.message || "Не удалось загрузить данные страницы.");
+
+      if (!silent) {
+        setErrorText(err?.message || "Не удалось загрузить данные страницы.");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }
 
   useEffect(() => {
     loadPageData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const suppliersMap = useMemo(() => {
@@ -107,12 +125,14 @@ export default function AdminUploadsPage() {
   function clearSelectedFile() {
     setFile(null);
     setFileName("");
+
     const input = document.getElementById("csv-upload-input");
     if (input) input.value = "";
   }
 
   function handleSupplierChange(value) {
     setSupplierId(value);
+
     const supplier = suppliersMap[value];
     if (supplier?.price_type) {
       setPriceType(supplier.price_type);
@@ -149,7 +169,6 @@ export default function AdminUploadsPage() {
       const parsed = await parseSourceFile(file, ruleData.rule);
       const sourceRows = parsed.rows;
 
-      console.log("IMPORT DEBUG", parsed.debug);
       console.log("IMPORT DEBUG", {
         supplierId,
         rule: ruleData.rule,
@@ -184,6 +203,7 @@ export default function AdminUploadsPage() {
 
       for (let i = 0; i < normalizedRows.length; i += BIG_UPLOAD_CHUNK) {
         const chunk = normalizedRows.slice(i, i + BIG_UPLOAD_CHUNK);
+
         await postJson("/api/admin/uploads/append", {
           action: "append",
           rows: chunk
@@ -244,7 +264,9 @@ export default function AdminUploadsPage() {
       clearSelectedFile();
       resetPreviewState();
 
-      await loadPageData();
+      loadPageData({ silent: true, keepMessage: true }).catch((err) => {
+        console.error("Silent uploads page refresh error:", err);
+      });
     } catch (err) {
       console.error("Commit error:", err);
       setErrorText(err?.message || "Ошибка загрузки прайса.");
@@ -303,6 +325,7 @@ export default function AdminUploadsPage() {
         rowsEmptyName,
         rowsReady
       });
+
       setPreviewRows(normalizedRows.slice(0, 20));
 
       setMessage("Очищаю временную таблицу...");
@@ -331,7 +354,9 @@ export default function AdminUploadsPage() {
         uploaded += chunk.length;
       }
 
-      setMessage(`Файл загружен во временную таблицу (${uploaded} строк). Подготавливаю перенос...`);
+      setMessage(
+        `Файл загружен во временную таблицу (${uploaded} строк). Подготавливаю перенос...`
+      );
 
       const prepare = await postJson("/api/admin/uploads/commit-step", {
         action: "prepare",
@@ -396,7 +421,9 @@ export default function AdminUploadsPage() {
       setPreviewReady(false);
       clearSelectedFile();
 
-      await loadPageData();
+      loadPageData({ silent: true, keepMessage: true }).catch((err) => {
+        console.error("Silent uploads page refresh error:", err);
+      });
     } catch (err) {
       console.error("Big upload error:", err);
       setErrorText(err?.message || "Ошибка загрузки большого прайса.");
@@ -718,6 +745,17 @@ export default function AdminUploadsPage() {
   );
 }
 
+function withTimeout(promise, ms, errorMessage) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(errorMessage || "Запрос выполнялся слишком долго."));
+      }, ms);
+    })
+  ]);
+}
+
 async function postJson(url, payload) {
   const res = await fetch(url, {
     method: "POST",
@@ -769,7 +807,6 @@ async function parseSourceFile(file, rule) {
 
   if (ext === "csv") {
     const matrix = await parseCsvFile(file);
-
     const parsed = matrixToObjects(matrix, rule);
 
     return {
@@ -953,18 +990,21 @@ function normalizeRowsByRule(sourceRows, rule, aliases) {
     aliasMap.pn,
     rule.pn_column_index
   );
+
   const nameKey = resolveColumnKey(
     sourceRows,
     rule.name_column,
     aliasMap.name,
     rule.name_column_index
   );
+
   const qtyKey = resolveColumnKey(
     sourceRows,
     rule.qty_column,
     aliasMap.qty,
     rule.qty_column_index
   );
+
   const brandKey = resolveColumnKey(
     sourceRows,
     rule.brand_column,
@@ -1147,6 +1187,7 @@ function parseCsvFile(file) {
           reject(new Error(results.errors[0].message || "Ошибка чтения CSV."));
           return;
         }
+
         resolve(results.data || []);
       },
       error: (error) => {
