@@ -5,6 +5,15 @@ import { supabase } from "../lib/supabaseClient";
 
 const AuthContext = createContext(null);
 
+function withTimeout(promise, ms, fallbackValue = null) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      setTimeout(() => resolve(fallbackValue), ms);
+    })
+  ]);
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -13,53 +22,92 @@ export function AuthProvider({ children }) {
   async function loadProfile(nextSession) {
     if (!nextSession?.user) {
       setProfile(null);
-      return;
+      return null;
     }
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", nextSession.user.id)
-      .maybeSingle();
+    try {
+      const result = await withTimeout(
+        supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", nextSession.user.id)
+          .maybeSingle(),
+        8000,
+        { data: null, error: new Error("Profile request timeout") }
+      );
 
-    if (error) {
-      console.error("Profile load error:", error);
+      if (result?.error) {
+        console.error("Profile load error:", result.error);
+        setProfile(null);
+        return null;
+      }
+
+      setProfile(result?.data || null);
+      return result?.data || null;
+    } catch (error) {
+      console.error("Profile load exception:", error);
       setProfile(null);
-      return;
+      return null;
     }
-
-    setProfile(data || null);
   }
 
   useEffect(() => {
     let mounted = true;
 
-    async function init() {
-      const {
-        data: { session: currentSession },
-      } = await supabase.auth.getSession();
+    async function initAuth() {
+      setAuthReady(false);
 
-      if (!mounted) return;
+      try {
+        const sessionResult = await withTimeout(
+          supabase.auth.getSession(),
+          8000,
+          { data: { session: null }, error: new Error("Session request timeout") }
+        );
 
-      setSession(currentSession);
-      await loadProfile(currentSession);
+        if (!mounted) return;
 
-      if (!mounted) return;
-      setAuthReady(true);
+        const currentSession = sessionResult?.data?.session || null;
+
+        setSession(currentSession);
+        await loadProfile(currentSession);
+      } catch (error) {
+        console.error("Auth init error:", error);
+
+        if (!mounted) return;
+
+        setSession(null);
+        setProfile(null);
+      } finally {
+        if (mounted) {
+          setAuthReady(true);
+        }
+      }
     }
 
-    init();
+    initAuth();
 
     const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return;
 
       setSession(nextSession);
-      await loadProfile(nextSession);
 
-      if (!mounted) return;
-      setAuthReady(true);
+      // Важно: не await внутри onAuthStateChange, чтобы не ловить подвисания
+      setTimeout(async () => {
+        if (!mounted) return;
+
+        try {
+          await loadProfile(nextSession);
+        } catch (error) {
+          console.error("Auth state profile reload error:", error);
+          setProfile(null);
+        } finally {
+          if (mounted) {
+            setAuthReady(true);
+          }
+        }
+      }, 0);
     });
 
     return () => {
@@ -74,7 +122,7 @@ export function AuthProvider({ children }) {
       user: session?.user || null,
       profile,
       authReady,
-      isAdmin: profile?.role === "admin",
+      isAdmin: profile?.role === "admin"
     }),
     [session, profile, authReady]
   );
