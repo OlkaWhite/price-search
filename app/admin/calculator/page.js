@@ -133,7 +133,87 @@ export default function CalculatorPage() {
   const zeroPrice = parseNumber(zeroPriceInput);
   const invoicePrice = parseNumber(invoiceInput);
 
+ 
+
   /* =========================================================
+     RUB
+  ========================================================= */
+
+  const rubCalculation = useMemo(() => {
+    if (!rubBynRate || !rubPrice) {
+      return {
+        baseWithVat: 0,
+        baseWithoutVat: 0,
+
+        tenWithVat: 0,
+        tenWithoutVat: 0,
+
+        thirteenWithVat: 0,
+        thirteenWithoutVat: 0,
+
+        twentyThreeWithVat: 0,
+        twentyThreeWithoutVat: 0,
+      };
+    }
+
+    const baseWithVat =
+      rubPrice *
+      rubBynRate *
+      VAT;
+
+    const baseWithoutVat =
+      baseWithVat / VAT;
+
+    /*
+      10% — формула из Excel
+    */
+    const tenWithVat =
+      (baseWithoutVat / 1.089) *
+      VAT;
+
+    const tenWithoutVat =
+      tenWithVat / 1.22;
+
+    /*
+      13% — формула из Excel
+    */
+    const thirteenWithVat =
+      (baseWithoutVat / 1.06) *
+      VAT;
+
+    const thirteenWithoutVat =
+      thirteenWithVat / 1.22;
+
+    /*
+      23% — формула из Excel
+    */
+    const twentyThreeWithVat =
+      baseWithoutVat *
+      1.03 *
+      VAT;
+
+    const twentyThreeWithoutVat =
+      twentyThreeWithVat / VAT;
+
+    return {
+      baseWithVat,
+      baseWithoutVat,
+
+      tenWithVat,
+      tenWithoutVat,
+
+      thirteenWithVat,
+      thirteenWithoutVat,
+
+      twentyThreeWithVat,
+      twentyThreeWithoutVat,
+    };
+  }, [
+    rubPrice,
+    rubBynRate,
+  ]);
+
+    /* =========================================================
      USD
   ========================================================= */
 
@@ -224,84 +304,6 @@ export default function CalculatorPage() {
   }, [
     usdPrice,
     usdRubRate,
-    rubBynRate,
-  ]);
-
-  /* =========================================================
-     RUB
-  ========================================================= */
-
-  const rubCalculation = useMemo(() => {
-    if (!rubBynRate || !rubPrice) {
-      return {
-        baseWithVat: 0,
-        baseWithoutVat: 0,
-
-        tenWithVat: 0,
-        tenWithoutVat: 0,
-
-        thirteenWithVat: 0,
-        thirteenWithoutVat: 0,
-
-        twentyThreeWithVat: 0,
-        twentyThreeWithoutVat: 0,
-      };
-    }
-
-    const baseWithVat =
-      rubPrice *
-      rubBynRate *
-      VAT;
-
-    const baseWithoutVat =
-      baseWithVat / VAT;
-
-    /*
-      10% — формула из Excel
-    */
-    const tenWithVat =
-      (baseWithoutVat / 1.089) *
-      VAT;
-
-    const tenWithoutVat =
-      tenWithVat / 1.22;
-
-    /*
-      13% — формула из Excel
-    */
-    const thirteenWithVat =
-      (baseWithoutVat / 1.06) *
-      VAT;
-
-    const thirteenWithoutVat =
-      thirteenWithVat / 1.22;
-
-    /*
-      23% — формула из Excel
-    */
-    const twentyThreeWithVat =
-      baseWithoutVat *
-      1.03 *
-      VAT;
-
-    const twentyThreeWithoutVat =
-      twentyThreeWithVat / VAT;
-
-    return {
-      baseWithVat,
-      baseWithoutVat,
-
-      tenWithVat,
-      tenWithoutVat,
-
-      thirteenWithVat,
-      thirteenWithoutVat,
-
-      twentyThreeWithVat,
-      twentyThreeWithoutVat,
-    };
-  }, [
-    rubPrice,
     rubBynRate,
   ]);
 
