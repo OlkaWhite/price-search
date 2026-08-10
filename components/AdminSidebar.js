@@ -11,7 +11,8 @@ const items = [
   { href: "/admin/users", label: "Клиенты" },
   { href: "/admin/analytics", label: "Аналитика" },
   { href: "/admin/brands", label: "Бренды" },
-  { href: "/admin/settings", label: "Настройки" }
+  { href: "/admin/settings", label: "Настройки" },
+  { href: "/admin/calculator", label: "Калькулятор" }
 ];
 
 export default function AdminSidebar() {
