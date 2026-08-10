@@ -655,14 +655,14 @@ export default function CalculatorPage() {
                 rubCalculation.baseWithoutVat,
             },
             {
-              label: "10%",
+              label: "Без НДС + 10%",
               withVat:
                 rubCalculation.tenWithVat,
               withoutVat:
                 rubCalculation.tenWithoutVat,
             },
             {
-              label: "13%",
+              label: "Без НДС +13%",
               withVat:
                 rubCalculation.thirteenWithVat,
               withoutVat:
