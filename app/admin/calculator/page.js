@@ -574,7 +574,7 @@ export default function CalculatorPage() {
         ================================================= */}
 
         <CalculatorCard
-          title="Цена в RUB"
+          title="Цена в российских рубля"
           inputLabel="Цена поставщика"
           inputValue={rubPriceInput}
           onInputChange={
@@ -618,7 +618,7 @@ export default function CalculatorPage() {
         ================================================= */}
 
         <CalculatorCard
-          title="Цена в USD"
+          title="Цена в долларах USD"
           inputLabel="Цена поставщика"
           inputValue={usdPriceInput}
           onInputChange={
@@ -687,7 +687,7 @@ export default function CalculatorPage() {
         ================================================= */}
 
         <CalculatorCard
-          title="Цена в 0"
+          title="Цена с нулевым НДС (прямой контракт)"
           inputLabel="Исходная цена"
           inputValue={
             zeroPriceInput
