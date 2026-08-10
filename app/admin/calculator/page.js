@@ -947,42 +947,46 @@ function CalculatorCard({
           </div>
         </div>
 
-        {rows.map(
-          (row, index) => (
-            <div
-              key={`${title}-${row.label}-${index}`}
-              style={styles.tableRow}
-            >
-              <div
-                style={
-                  styles.rowLabel
-                }
-              >
-                {row.label}
-              </div>
+        {rows.map((row, index) => {
+  const isBase = row.label === "Базовая";
 
-              <div
-                style={
-                  styles.withVatCell
-                }
-              >
-                {formatMoney(
-                  row.withVat
-                )}
-              </div>
+  return (
+    <div
+      key={`${title}-${row.label}-${index}`}
+      style={{
+        ...styles.tableRow,
+        ...(isBase ? styles.baseRow : {}),
+      }}
+    >
+      <div
+        style={{
+          ...styles.rowLabel,
+          ...(isBase ? styles.baseRowLabel : {}),
+        }}
+      >
+        {row.label}
+      </div>
 
-              <div
-                style={
-                  styles.withoutVatCell
-                }
-              >
-                {formatMoney(
-                  row.withoutVat
-                )}
-              </div>
-            </div>
-          )
-        )}
+      <div
+        style={{
+          ...styles.withVatCell,
+          ...(isBase ? styles.baseRowValue : {}),
+        }}
+      >
+        {formatMoney(row.withVat)}
+      </div>
+
+      <div
+        style={{
+          ...styles.withoutVatCell,
+          ...(isBase ? styles.baseRowValue : {}),
+        }}
+      >
+        {formatMoney(row.withoutVat)}
+      </div>
+    </div>
+  );
+})}
       </div>
     </section>
   );
@@ -1334,4 +1338,19 @@ const styles = {
     lineHeight: 1.4,
     color: "#888",
   },
+   baseRow: {
+  background: "#fff7d6",
+},
+
+baseRowLabel: {
+  background: "#fff2b8",
+  color: "#7a5b00",
+  fontWeight: 800,
+},
+
+baseRowValue: {
+  background: "#fff8dc",
+  color: "#5f4700",
+  fontWeight: 800,
+},
 };
