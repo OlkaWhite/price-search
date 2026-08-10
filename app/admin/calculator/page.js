@@ -884,19 +884,19 @@ function CalculatorCard({
 const styles = {
   page: {
     width: "100%",
-    maxWidth: 1000,
-    paddingBottom: 60,
+    maxWidth: 920,
+    paddingBottom: 40,
   },
 
   pageHeader: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 24,
+    marginBottom: 16,
   },
 
   title: {
-    fontSize: 34,
+    fontSize: 28,
     lineHeight: 1.2,
     margin: 0,
     fontWeight: 800,
@@ -904,63 +904,62 @@ const styles = {
   },
 
   subtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#777",
-    marginTop: 6,
+    marginTop: 4,
   },
 
   card: {
     background: "#fff",
     border: "1px solid #e2e2e2",
-    borderRadius: 16,
-    padding: 22,
-    marginBottom: 18,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
     boxSizing: "border-box",
   },
 
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: 750,
-    marginBottom: 20,
+    marginBottom: 14,
     color: "#111",
   },
 
   ratesGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(260px, 1fr))",
-    gap: 16,
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: 12,
   },
 
   rateBox: {
-    padding: 18,
+    padding: 14,
     border: "1px solid #e4e4e4",
-    borderRadius: 12,
+    borderRadius: 10,
     background: "#fafafa",
   },
 
   inputLabel: {
     display: "block",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 600,
     color: "#666",
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   rateValue: {
-    fontSize: 30,
+    fontSize: 24,
     fontWeight: 800,
     color: "#111",
-    lineHeight: 1.2,
+    lineHeight: 1.15,
   },
 
   rateInput: {
     width: "100%",
-    height: 48,
-    padding: "0 14px",
+    height: 40,
+    padding: "0 12px",
     border: "1px solid #d5d5d5",
-    borderRadius: 10,
-    fontSize: 20,
+    borderRadius: 8,
+    fontSize: 17,
     fontWeight: 700,
     outline: "none",
     boxSizing: "border-box",
@@ -968,83 +967,83 @@ const styles = {
   },
 
   rateMeta: {
-    minHeight: 20,
-    marginTop: 8,
-    marginBottom: 14,
-    fontSize: 12,
+    minHeight: 16,
+    marginTop: 6,
+    marginBottom: 10,
+    fontSize: 11,
     color: "#888",
   },
 
   primaryButton: {
     border: "none",
-    borderRadius: 9,
+    borderRadius: 8,
     background: "#111",
     color: "#fff",
-    padding: "9px 14px",
+    padding: "7px 12px",
     cursor: "pointer",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 600,
   },
 
   secondaryButton: {
     border: "1px solid #d5d5d5",
-    borderRadius: 9,
+    borderRadius: 8,
     background: "#fff",
     color: "#222",
-    padding: "9px 14px",
+    padding: "7px 12px",
     cursor: "pointer",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 600,
   },
 
   inputArea: {
     display: "flex",
     alignItems: "flex-end",
-    gap: 20,
-    marginBottom: 22,
+    gap: 14,
+    marginBottom: 14,
     flexWrap: "wrap",
   },
 
   inputWithSuffix: {
     display: "flex",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
 
   largeInput: {
     width: "100%",
-    minWidth: 180,
-    height: 52,
+    minWidth: 160,
+    height: 42,
     border: "1px solid #d6d6d6",
-    borderRadius: 10,
-    padding: "0 15px",
+    borderRadius: 8,
+    padding: "0 12px",
     boxSizing: "border-box",
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: 700,
     outline: "none",
     background: "#fff",
   },
 
   inputSuffix: {
-    minWidth: 50,
-    fontSize: 14,
+    minWidth: 44,
+    fontSize: 12,
     fontWeight: 700,
     color: "#666",
   },
 
   extraBlock: {
-    minWidth: 220,
+    minWidth: 200,
   },
 
   conversionInfo: {
-    minHeight: 52,
+    minHeight: 42,
     display: "flex",
     alignItems: "center",
-    padding: "0 15px",
-    borderRadius: 10,
+    padding: "0 12px",
+    borderRadius: 8,
     background: "#f5f5f5",
     border: "1px solid #e3e3e3",
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: 700,
     boxSizing: "border-box",
   },
@@ -1052,63 +1051,63 @@ const styles = {
   resultTable: {
     overflow: "hidden",
     border: "1px solid #dedede",
-    borderRadius: 12,
+    borderRadius: 10,
   },
 
   tableHeaderRow: {
     display: "grid",
-    gridTemplateColumns: "140px 1fr 1fr",
+    gridTemplateColumns: "110px 1fr 1fr",
   },
 
   tableHeaderLabel: {
     background: "#f7f7f7",
-    padding: 13,
+    padding: 9,
   },
 
   withVatHeader: {
-    padding: 13,
+    padding: 9,
     textAlign: "center",
     background: "#dff3d3",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 700,
     borderLeft: "1px solid #dedede",
   },
 
   withoutVatHeader: {
-    padding: 13,
+    padding: 9,
     textAlign: "center",
     background: "#d5f0fa",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 700,
     borderLeft: "1px solid #dedede",
   },
 
   tableRow: {
     display: "grid",
-    gridTemplateColumns: "140px 1fr 1fr",
+    gridTemplateColumns: "110px 1fr 1fr",
     borderTop: "1px solid #dedede",
   },
 
   rowLabel: {
-    padding: "14px 16px",
-    fontSize: 14,
+    padding: "10px 12px",
+    fontSize: 13,
     fontWeight: 700,
     background: "#fafafa",
   },
 
   withVatCell: {
-    padding: "14px 16px",
+    padding: "10px 12px",
     textAlign: "right",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: 750,
     background: "#f3faef",
     borderLeft: "1px solid #dedede",
   },
 
   withoutVatCell: {
-    padding: "14px 16px",
+    padding: "10px 12px",
     textAlign: "right",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: 750,
     background: "#eef9fd",
     borderLeft: "1px solid #dedede",
@@ -1116,32 +1115,31 @@ const styles = {
 
   invoiceGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(260px, 1fr))",
-    gap: 20,
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: 14,
     alignItems: "end",
   },
 
   bitrixBox: {
-    minHeight: 52,
+    minHeight: 42,
     border: "1px solid #cfe7c5",
-    borderRadius: 10,
+    borderRadius: 8,
     background: "#f2faee",
-    padding: "8px 10px 8px 15px",
+    padding: "6px 8px 6px 12px",
     boxSizing: "border-box",
     display: "flex",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
 
   bitrixValue: {
-    fontSize: 24,
+    fontSize: 19,
     fontWeight: 800,
     flex: 1,
   },
 
   bitrixCurrency: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: 700,
     color: "#777",
   },
@@ -1149,10 +1147,10 @@ const styles = {
   copyButton: {
     border: "1px solid #c9c9c9",
     background: "#fff",
-    borderRadius: 8,
-    padding: "8px 11px",
+    borderRadius: 7,
+    padding: "6px 9px",
     cursor: "pointer",
-    fontSize: 12,
+    fontSize: 11,
     whiteSpace: "nowrap",
   },
 };
