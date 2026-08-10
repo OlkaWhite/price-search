@@ -567,7 +567,53 @@ export default function CalculatorPage() {
         className="calculator-grid"
         style={styles.calculatorsGrid}
       >
+       
+
         {/* =================================================
+            RUB
+        ================================================= */}
+
+        <CalculatorCard
+          title="Цена в RUB"
+          inputLabel="Цена поставщика"
+          inputValue={rubPriceInput}
+          onInputChange={
+            setRubPriceInput
+          }
+          suffix="RUB"
+          rows={[
+            {
+              label: "Базовая",
+              withVat:
+                rubCalculation.baseWithVat,
+              withoutVat:
+                rubCalculation.baseWithoutVat,
+            },
+            {
+              label: "Без НДС + 10%",
+              withVat:
+                rubCalculation.tenWithVat,
+              withoutVat:
+                rubCalculation.tenWithoutVat,
+            },
+            {
+              label: "Без НДС +13%",
+              withVat:
+                rubCalculation.thirteenWithVat,
+              withoutVat:
+                rubCalculation.thirteenWithoutVat,
+            },
+            {
+              label: "23%",
+              withVat:
+                rubCalculation.twentyThreeWithVat,
+              withoutVat:
+                rubCalculation.twentyThreeWithoutVat,
+            },
+          ]}
+        />
+
+              {/* =================================================
             USD
         ================================================= */}
 
@@ -632,50 +678,6 @@ export default function CalculatorPage() {
                 usdCalculation.sixWithVat,
               withoutVat:
                 usdCalculation.sixWithoutVat,
-            },
-          ]}
-        />
-
-        {/* =================================================
-            RUB
-        ================================================= */}
-
-        <CalculatorCard
-          title="Цена в RUB"
-          inputLabel="Цена поставщика"
-          inputValue={rubPriceInput}
-          onInputChange={
-            setRubPriceInput
-          }
-          suffix="RUB"
-          rows={[
-            {
-              label: "Базовая",
-              withVat:
-                rubCalculation.baseWithVat,
-              withoutVat:
-                rubCalculation.baseWithoutVat,
-            },
-            {
-              label: "Без НДС + 10%",
-              withVat:
-                rubCalculation.tenWithVat,
-              withoutVat:
-                rubCalculation.tenWithoutVat,
-            },
-            {
-              label: "Без НДС +13%",
-              withVat:
-                rubCalculation.thirteenWithVat,
-              withoutVat:
-                rubCalculation.thirteenWithoutVat,
-            },
-            {
-              label: "23%",
-              withVat:
-                rubCalculation.twentyThreeWithVat,
-              withoutVat:
-                rubCalculation.twentyThreeWithoutVat,
             },
           ]}
         />
