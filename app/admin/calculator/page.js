@@ -59,7 +59,7 @@ export default function CalculatorPage() {
   const [zeroPriceInput, setZeroPriceInput] = useState("");
   const [invoiceInput, setInvoiceInput] = useState("");
 
-  /* Скопировано */
+  /* Скопировано в блоке счёта */
   const [copied, setCopied] = useState(false);
 
   /* =========================================================
@@ -85,25 +85,18 @@ export default function CalculatorPage() {
       setRateLoading(true);
       setRateError("");
 
-      const response = await fetch(
-        "/api/admin/cbr-rate",
-        {
-          cache: "no-store",
-        }
-      );
+      const response = await fetch("/api/admin/cbr-rate", {
+        cache: "no-store",
+      });
 
       if (!response.ok) {
-        throw new Error(
-          "Не удалось получить курс ЦБ РФ"
-        );
+        throw new Error("Не удалось получить курс ЦБ РФ");
       }
 
       const data = await response.json();
 
       if (!data?.rate) {
-        throw new Error(
-          "Курс USD не получен"
-        );
+        throw new Error("Курс USD не получен");
       }
 
       setUsdRubRate(Number(data.rate));
@@ -111,9 +104,7 @@ export default function CalculatorPage() {
     } catch (error) {
       console.error(error);
 
-      setRateError(
-        "Не удалось получить курс"
-      );
+      setRateError("Не удалось получить курс");
     } finally {
       setRateLoading(false);
     }
@@ -124,7 +115,7 @@ export default function CalculatorPage() {
   }, []);
 
   /* =========================================================
-     ПАРСИНГ ЗНАЧЕНИЙ
+     ПАРСИНГ
   ========================================================= */
 
   const rubBynRate = parseNumber(rubBynInput);
@@ -132,8 +123,6 @@ export default function CalculatorPage() {
   const rubPrice = parseNumber(rubPriceInput);
   const zeroPrice = parseNumber(zeroPriceInput);
   const invoicePrice = parseNumber(invoiceInput);
-
- 
 
   /* =========================================================
      RUB
@@ -157,40 +146,25 @@ export default function CalculatorPage() {
     }
 
     const baseWithVat =
-      rubPrice *
-      rubBynRate *
-      VAT;
+      rubPrice * rubBynRate * VAT;
 
     const baseWithoutVat =
       baseWithVat / VAT;
 
-    /*
-      10% — формула из Excel
-    */
     const tenWithVat =
-      (baseWithoutVat / 1.089) *
-      VAT;
+      (baseWithoutVat / 1.089) * VAT;
 
     const tenWithoutVat =
       tenWithVat / 1.22;
 
-    /*
-      13% — формула из Excel
-    */
     const thirteenWithVat =
-      (baseWithoutVat / 1.06) *
-      VAT;
+      (baseWithoutVat / 1.06) * VAT;
 
     const thirteenWithoutVat =
       thirteenWithVat / 1.22;
 
-    /*
-      23% — формула из Excel
-    */
     const twentyThreeWithVat =
-      baseWithoutVat *
-      1.03 *
-      VAT;
+      baseWithoutVat * 1.03 * VAT;
 
     const twentyThreeWithoutVat =
       twentyThreeWithVat / VAT;
@@ -208,12 +182,9 @@ export default function CalculatorPage() {
       twentyThreeWithVat,
       twentyThreeWithoutVat,
     };
-  }, [
-    rubPrice,
-    rubBynRate,
-  ]);
+  }, [rubPrice, rubBynRate]);
 
-    /* =========================================================
+  /* =========================================================
      USD
   ========================================================= */
 
@@ -252,9 +223,6 @@ export default function CalculatorPage() {
     const baseWithoutVat =
       baseWithVat / VAT;
 
-    /*
-      Строка 0% — как в Excel
-    */
     const zeroWithVat =
       usdPrice *
       usdRubRate *
@@ -264,24 +232,14 @@ export default function CalculatorPage() {
     const zeroWithoutVat =
       zeroWithVat / 1.22;
 
-    /*
-      +3%
-    */
     const threeWithVat =
-      baseWithoutVat *
-      1.03 *
-      VAT;
+      baseWithoutVat * 1.03 * VAT;
 
     const threeWithoutVat =
       threeWithVat / VAT;
 
-    /*
-      +6%
-    */
     const sixWithVat =
-      baseWithoutVat *
-      1.06 *
-      VAT;
+      baseWithoutVat * 1.06 * VAT;
 
     const sixWithoutVat =
       sixWithVat / VAT;
@@ -329,36 +287,28 @@ export default function CalculatorPage() {
     }
 
     const baseWithoutVat =
-      zeroPrice *
-      rubBynRate;
+      zeroPrice * rubBynRate;
 
     const baseWithVat =
-      baseWithoutVat *
-      VAT;
+      baseWithoutVat * VAT;
 
     const tenWithoutVat =
-      baseWithoutVat *
-      1.1;
+      baseWithoutVat * 1.1;
 
     const tenWithVat =
-      tenWithoutVat *
-      VAT;
+      tenWithoutVat * VAT;
 
     const thirteenWithoutVat =
-      baseWithoutVat *
-      1.13;
+      baseWithoutVat * 1.13;
 
     const thirteenWithVat =
-      thirteenWithoutVat *
-      VAT;
+      thirteenWithoutVat * VAT;
 
     const fifteenWithoutVat =
-      baseWithoutVat *
-      1.15;
+      baseWithoutVat * 1.15;
 
     const fifteenWithVat =
-      fifteenWithoutVat *
-      VAT;
+      fifteenWithoutVat * VAT;
 
     return {
       baseWithVat,
@@ -379,7 +329,7 @@ export default function CalculatorPage() {
   ]);
 
   /* =========================================================
-     СЧЕТ / BITRIX
+     СЧЁТ / BITRIX
   ========================================================= */
 
   const invoiceWithoutVat =
@@ -397,9 +347,7 @@ export default function CalculatorPage() {
       rubBynInput
     );
 
-    alert(
-      "Курс RUB → BYN сохранён"
-    );
+    alert("Курс RUB → BYN сохранён");
   }
 
   /* =========================================================
@@ -414,9 +362,7 @@ export default function CalculatorPage() {
       .replace(".", ",");
 
     try {
-      await navigator.clipboard.writeText(
-        value
-      );
+      await navigator.clipboard.writeText(value);
 
       setCopied(true);
 
@@ -443,8 +389,7 @@ export default function CalculatorPage() {
           </h1>
 
           <div style={styles.subtitle}>
-            Расчёт закупочной и конечной
-            стоимости
+            Расчёт закупочной и конечной стоимости
           </div>
         </div>
       </div>
@@ -476,21 +421,14 @@ export default function CalculatorPage() {
                 {rateLoading
                   ? "..."
                   : usdRubRate
-                    ? formatRate(
-                        usdRubRate,
-                        4
-                      )
+                    ? formatRate(usdRubRate, 4)
                     : "—"}
               </div>
 
               <button
                 type="button"
-                onClick={
-                  loadUsdRubRate
-                }
-                style={
-                  styles.smallRefreshButton
-                }
+                onClick={loadUsdRubRate}
+                style={styles.smallRefreshButton}
               >
                 Обновить
               </button>
@@ -519,9 +457,7 @@ export default function CalculatorPage() {
           {/* RUB → BYN */}
 
           <div style={styles.rateBox}>
-            <label
-              style={styles.inputLabel}
-            >
+            <label style={styles.inputLabel}>
               RUB → BYN
             </label>
 
@@ -531,9 +467,7 @@ export default function CalculatorPage() {
                 inputMode="decimal"
                 value={rubBynInput}
                 onChange={(e) =>
-                  setRubBynInput(
-                    e.target.value
-                  )
+                  setRubBynInput(e.target.value)
                 }
                 style={styles.rateInput}
                 placeholder="0,0365"
@@ -541,12 +475,8 @@ export default function CalculatorPage() {
 
               <button
                 type="button"
-                onClick={
-                  saveRubBynRate
-                }
-                style={
-                  styles.primaryButton
-                }
+                onClick={saveRubBynRate}
+                style={styles.primaryButton}
               >
                 Сохранить
               </button>
@@ -567,19 +497,13 @@ export default function CalculatorPage() {
         className="calculator-grid"
         style={styles.calculatorsGrid}
       >
-       
-
-        {/* =================================================
-            RUB
-        ================================================= */}
+        {/* RUB */}
 
         <CalculatorCard
-          title="Цена в российских рубля"
+          title="Цена в российских рублях"
           inputLabel="Цена поставщика"
           inputValue={rubPriceInput}
-          onInputChange={
-            setRubPriceInput
-          }
+          onInputChange={setRubPriceInput}
           suffix="RUB"
           rows={[
             {
@@ -613,35 +537,23 @@ export default function CalculatorPage() {
           ]}
         />
 
-              {/* =================================================
-            USD
-        ================================================= */}
+        {/* USD */}
 
         <CalculatorCard
           title="Цена в долларах USD"
           inputLabel="Цена поставщика"
           inputValue={usdPriceInput}
-          onInputChange={
-            setUsdPriceInput
-          }
+          onInputChange={setUsdPriceInput}
           suffix="USD"
           extra={
             usdPrice > 0 &&
             usdRubRate ? (
               <>
-                <div
-                  style={
-                    styles.inputLabel
-                  }
-                >
+                <div style={styles.inputLabel}>
                   Цена в RUB
                 </div>
 
-                <div
-                  style={
-                    styles.conversionInfo
-                  }
-                >
+                <div style={styles.conversionInfo}>
                   {formatMoney(
                     usdCalculation.rubWithoutVat
                   )}{" "}
@@ -682,19 +594,13 @@ export default function CalculatorPage() {
           ]}
         />
 
-        {/* =================================================
-            ЦЕНА В 0
-        ================================================= */}
+        {/* ЦЕНА В 0 */}
 
         <CalculatorCard
           title="Цена с нулевым НДС (прямой контракт)"
           inputLabel="Исходная цена"
-          inputValue={
-            zeroPriceInput
-          }
-          onInputChange={
-            setZeroPriceInput
-          }
+          inputValue={zeroPriceInput}
+          onInputChange={setZeroPriceInput}
           suffix=""
           rows={[
             {
@@ -728,28 +634,16 @@ export default function CalculatorPage() {
           ]}
         />
 
-        {/* =================================================
-            СЧЕТ
-        ================================================= */}
+        {/* СЧЁТ */}
 
         <section style={styles.card}>
-          <div
-            style={styles.sectionTitle}
-          >
+          <div style={styles.sectionTitle}>
             Счёт
           </div>
 
-          <div
-            style={
-              styles.invoiceCompact
-            }
-          >
+          <div style={styles.invoiceCompact}>
             <div>
-              <label
-                style={
-                  styles.inputLabel
-                }
-              >
+              <label style={styles.inputLabel}>
                 Цена с НДС, BYN
               </label>
 
@@ -758,58 +652,33 @@ export default function CalculatorPage() {
                 inputMode="decimal"
                 value={invoiceInput}
                 onChange={(e) =>
-                  setInvoiceInput(
-                    e.target.value
-                  )
+                  setInvoiceInput(e.target.value)
                 }
-                style={
-                  styles.largeInput
-                }
+                style={styles.largeInput}
                 placeholder="0,00"
               />
             </div>
 
             <div>
-              <div
-                style={
-                  styles.inputLabel
-                }
-              >
-                Цена без НДС для
-                Bitrix
+              <div style={styles.inputLabel}>
+                Цена без НДС для Bitrix
               </div>
 
-              <div
-                style={
-                  styles.bitrixBox
-                }
-              >
-                <div
-                  style={
-                    styles.bitrixValue
-                  }
-                >
+              <div style={styles.bitrixBox}>
+                <div style={styles.bitrixValue}>
                   {formatMoney(
                     invoiceWithoutVat
                   )}
                 </div>
 
-                <div
-                  style={
-                    styles.bitrixCurrency
-                  }
-                >
+                <div style={styles.bitrixCurrency}>
                   BYN
                 </div>
 
                 <button
                   type="button"
-                  onClick={
-                    copyInvoicePrice
-                  }
-                  disabled={
-                    !invoiceWithoutVat
-                  }
+                  onClick={copyInvoicePrice}
+                  disabled={!invoiceWithoutVat}
                   style={{
                     ...styles.copyButton,
                     opacity:
@@ -825,23 +694,15 @@ export default function CalculatorPage() {
               </div>
             </div>
 
-            <div
-              style={
-                styles.invoiceHint
-              }
-            >
-              Вводишь итоговую цену
-              счёта с НДС — справа
-              получаешь цену без НДС
-              для Bitrix.
+            <div style={styles.invoiceHint}>
+              Вводишь итоговую цену счёта с НДС —
+              получаешь цену без НДС для Bitrix.
             </div>
           </div>
         </section>
       </div>
 
-      {/* =====================================================
-          АДАПТИВ
-      ===================================================== */}
+      {/* АДАПТИВ */}
 
       <style jsx>{`
         @media (max-width: 1100px) {
@@ -867,6 +728,33 @@ function CalculatorCard({
   rows,
   extra,
 }) {
+  const [copiedRow, setCopiedRow] = useState(null);
+
+  async function copyWithoutVat(value, rowKey) {
+    if (!Number.isFinite(value) || value === 0) {
+      return;
+    }
+
+    const text = value
+      .toFixed(2)
+      .replace(".", ",");
+
+    try {
+      await navigator.clipboard.writeText(text);
+
+      setCopiedRow(rowKey);
+
+      setTimeout(() => {
+        setCopiedRow(null);
+      }, 1500);
+    } catch (error) {
+      console.error(
+        "Ошибка копирования:",
+        error
+      );
+    }
+  }
+
   return (
     <section style={styles.card}>
       <div style={styles.sectionTitle}>
@@ -875,38 +763,24 @@ function CalculatorCard({
 
       <div style={styles.inputArea}>
         <div style={{ minWidth: 0 }}>
-          <label
-            style={styles.inputLabel}
-          >
+          <label style={styles.inputLabel}>
             {inputLabel}
           </label>
 
-          <div
-            style={
-              styles.inputWithSuffix
-            }
-          >
+          <div style={styles.inputWithSuffix}>
             <input
               type="text"
               inputMode="decimal"
               value={inputValue}
               onChange={(e) =>
-                onInputChange(
-                  e.target.value
-                )
+                onInputChange(e.target.value)
               }
-              style={
-                styles.largeInput
-              }
+              style={styles.largeInput}
               placeholder="0,00"
             />
 
             {suffix ? (
-              <div
-                style={
-                  styles.inputSuffix
-                }
-              >
+              <div style={styles.inputSuffix}>
                 {suffix}
               </div>
             ) : null}
@@ -914,83 +788,108 @@ function CalculatorCard({
         </div>
 
         {extra ? (
-          <div
-            style={styles.extraBlock}
-          >
+          <div style={styles.extraBlock}>
             {extra}
           </div>
         ) : null}
       </div>
 
       <div style={styles.resultTable}>
-        <div
-          style={
-            styles.tableHeaderRow
-          }
-        >
-          <div
-            style={
-              styles.tableHeaderLabel
-            }
-          />
+        {/* HEADER */}
 
-          <div
-            style={
-              styles.withVatHeader
-            }
-          >
-            С НДС
+        <div style={styles.tableHeaderRow}>
+          <div style={styles.tableHeaderLabel} />
+
+          <div style={styles.withoutVatHeader}>
+            Без НДС
           </div>
 
-          <div
-            style={
-              styles.withoutVatHeader
-            }
-          >
-            Без НДС
+          <div style={styles.withVatHeader}>
+            С НДС
           </div>
         </div>
 
+        {/* ROWS */}
+
         {rows.map((row, index) => {
-  const isBase = row.label === "Базовая";
+          const isBase =
+            row.label === "Базовая";
 
-  return (
-    <div
-      key={`${title}-${row.label}-${index}`}
-      style={{
-        ...styles.tableRow,
-        ...(isBase ? styles.baseRow : {}),
-      }}
-    >
-      <div
-        style={{
-          ...styles.rowLabel,
-          ...(isBase ? styles.baseRowLabel : {}),
-        }}
-      >
-        {row.label}
-      </div>
+          const rowKey =
+            `${title}-${row.label}-${index}`;
 
-      <div
-        style={{
-          ...styles.withVatCell,
-          ...(isBase ? styles.baseRowValue : {}),
-        }}
-      >
-        {formatMoney(row.withVat)}
-      </div>
+          const isCopied =
+            copiedRow === rowKey;
 
-      <div
-        style={{
-          ...styles.withoutVatCell,
-          ...(isBase ? styles.baseRowValue : {}),
-        }}
-      >
-        {formatMoney(row.withoutVat)}
-      </div>
-    </div>
-  );
-})}
+          return (
+            <div
+              key={rowKey}
+              style={{
+                ...styles.tableRow,
+                ...(isBase
+                  ? styles.baseRow
+                  : {}),
+              }}
+            >
+              <div
+                style={{
+                  ...styles.rowLabel,
+                  ...(isBase
+                    ? styles.baseRowLabel
+                    : {}),
+                }}
+              >
+                {row.label}
+              </div>
+
+              {/* БЕЗ НДС — КОПИРУЕТСЯ */}
+
+              <div
+                onClick={() =>
+                  copyWithoutVat(
+                    row.withoutVat,
+                    rowKey
+                  )
+                }
+                title="Нажмите, чтобы скопировать"
+                style={{
+                  ...styles.withoutVatCell,
+                  ...styles.copyableCell,
+                  ...(isBase
+                    ? styles.baseRowValue
+                    : {}),
+                }}
+              >
+                <span>
+                  {formatMoney(
+                    row.withoutVat
+                  )}
+                </span>
+
+                {isCopied ? (
+                  <span
+                    style={styles.copiedTooltip}
+                  >
+                    Скопировано ✓
+                  </span>
+                ) : null}
+              </div>
+
+              {/* С НДС */}
+
+              <div
+                style={{
+                  ...styles.withVatCell,
+                  ...(isBase
+                    ? styles.baseRowValue
+                    : {}),
+                }}
+              >
+                {formatMoney(row.withVat)}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -1010,8 +909,7 @@ const styles = {
   pageHeader: {
     display: "flex",
     alignItems: "center",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     marginBottom: 14,
   },
 
@@ -1029,14 +927,11 @@ const styles = {
     marginTop: 4,
   },
 
-  /* =========================
-     ОБЩАЯ КАРТОЧКА
-  ========================= */
+  /* ОБЩАЯ КАРТОЧКА */
 
   card: {
     background: "#fff",
-    border:
-      "1px solid #e2e2e2",
+    border: "1px solid #e2e2e2",
     borderRadius: 12,
     padding: 14,
     boxSizing: "border-box",
@@ -1049,9 +944,7 @@ const styles = {
     color: "#111",
   },
 
-  /* =========================
-     КУРСЫ
-  ========================= */
+  /* КУРСЫ */
 
   ratesGrid: {
     display: "grid",
@@ -1062,8 +955,7 @@ const styles = {
 
   rateBox: {
     padding: 12,
-    border:
-      "1px solid #e4e4e4",
+    border: "1px solid #e4e4e4",
     borderRadius: 9,
     background: "#fafafa",
   },
@@ -1100,8 +992,7 @@ const styles = {
     width: "100%",
     height: 38,
     padding: "0 11px",
-    border:
-      "1px solid #d5d5d5",
+    border: "1px solid #d5d5d5",
     borderRadius: 7,
     fontSize: 16,
     fontWeight: 700,
@@ -1131,8 +1022,7 @@ const styles = {
   },
 
   smallRefreshButton: {
-    border:
-      "1px solid #d5d5d5",
+    border: "1px solid #d5d5d5",
     borderRadius: 7,
     background: "#fff",
     color: "#222",
@@ -1142,9 +1032,7 @@ const styles = {
     fontWeight: 600,
   },
 
-  /* =========================
-     СЕТКА КАЛЬКУЛЯТОРА
-  ========================= */
+  /* GRID */
 
   calculatorsGrid: {
     display: "grid",
@@ -1154,9 +1042,7 @@ const styles = {
     alignItems: "stretch",
   },
 
-  /* =========================
-     INPUT
-  ========================= */
+  /* INPUT */
 
   inputArea: {
     display: "grid",
@@ -1176,8 +1062,7 @@ const styles = {
   largeInput: {
     width: "100%",
     height: 38,
-    border:
-      "1px solid #d6d6d6",
+    border: "1px solid #d6d6d6",
     borderRadius: 7,
     padding: "0 11px",
     boxSizing: "border-box",
@@ -1206,44 +1091,30 @@ const styles = {
     padding: "0 10px",
     borderRadius: 7,
     background: "#f5f5f5",
-    border:
-      "1px solid #e3e3e3",
+    border: "1px solid #e3e3e3",
     fontSize: 15,
     fontWeight: 700,
     boxSizing: "border-box",
     whiteSpace: "nowrap",
   },
 
-  /* =========================
-     ТАБЛИЦА
-  ========================= */
+  /* TABLE */
 
   resultTable: {
     overflow: "hidden",
-    border:
-      "1px solid #dedede",
+    border: "1px solid #dedede",
     borderRadius: 9,
   },
 
   tableHeaderRow: {
     display: "grid",
     gridTemplateColumns:
-      "90px 1fr 1fr",
+      "120px 1fr 1fr",
   },
 
   tableHeaderLabel: {
     background: "#f7f7f7",
     padding: 7,
-  },
-
-  withVatHeader: {
-    padding: 7,
-    textAlign: "center",
-    background: "#dff3d3",
-    fontSize: 11,
-    fontWeight: 700,
-    borderLeft:
-      "1px solid #dedede",
   },
 
   withoutVatHeader: {
@@ -1252,16 +1123,23 @@ const styles = {
     background: "#d5f0fa",
     fontSize: 11,
     fontWeight: 700,
-    borderLeft:
-      "1px solid #dedede",
+    borderLeft: "1px solid #dedede",
+  },
+
+  withVatHeader: {
+    padding: 7,
+    textAlign: "center",
+    background: "#dff3d3",
+    fontSize: 11,
+    fontWeight: 700,
+    borderLeft: "1px solid #dedede",
   },
 
   tableRow: {
     display: "grid",
     gridTemplateColumns:
-      "90px 1fr 1fr",
-    borderTop:
-      "1px solid #dedede",
+      "120px 1fr 1fr",
+    borderTop: "1px solid #dedede",
   },
 
   rowLabel: {
@@ -1271,29 +1149,47 @@ const styles = {
     background: "#fafafa",
   },
 
-  withVatCell: {
-    padding: "8px 10px",
-    textAlign: "right",
-    fontSize: 14,
-    fontWeight: 750,
-    background: "#f3faef",
-    borderLeft:
-      "1px solid #dedede",
-  },
-
   withoutVatCell: {
     padding: "8px 10px",
     textAlign: "right",
     fontSize: 14,
     fontWeight: 750,
     background: "#eef9fd",
-    borderLeft:
-      "1px solid #dedede",
+    borderLeft: "1px solid #dedede",
   },
 
-  /* =========================
-     СЧЁТ / BITRIX
-  ========================= */
+  withVatCell: {
+    padding: "8px 10px",
+    textAlign: "right",
+    fontSize: 14,
+    fontWeight: 750,
+    background: "#f3faef",
+    borderLeft: "1px solid #dedede",
+  },
+
+  copyableCell: {
+    position: "relative",
+    cursor: "pointer",
+    userSelect: "none",
+  },
+
+  copiedTooltip: {
+    position: "absolute",
+    right: 6,
+    top: "50%",
+    transform: "translateY(-50%)",
+    background: "#222",
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: 600,
+    padding: "4px 6px",
+    borderRadius: 5,
+    whiteSpace: "nowrap",
+    zIndex: 5,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+  },
+
+  /* СЧЁТ */
 
   invoiceCompact: {
     display: "grid",
@@ -1303,8 +1199,7 @@ const styles = {
 
   bitrixBox: {
     minHeight: 42,
-    border:
-      "1px solid #cfe7c5",
+    border: "1px solid #cfe7c5",
     borderRadius: 8,
     background: "#f2faee",
     padding: "5px 7px 5px 11px",
@@ -1327,8 +1222,7 @@ const styles = {
   },
 
   copyButton: {
-    border:
-      "1px solid #c9c9c9",
+    border: "1px solid #c9c9c9",
     background: "#fff",
     borderRadius: 6,
     padding: "6px 8px",
@@ -1342,19 +1236,22 @@ const styles = {
     lineHeight: 1.4,
     color: "#888",
   },
-   baseRow: {
-  background: "#fff7d6",
-},
 
-baseRowLabel: {
-  background: "#fff2b8",
-  color: "#7a5b00",
-  fontWeight: 800,
-},
+  /* БАЗОВАЯ СТРОКА */
 
-baseRowValue: {
-  background: "#fff8dc",
-  color: "#5f4700",
-  fontWeight: 800,
-},
+  baseRow: {
+    background: "#fff7d6",
+  },
+
+  baseRowLabel: {
+    background: "#fff2b8",
+    color: "#7a5b00",
+    fontWeight: 800,
+  },
+
+  baseRowValue: {
+    background: "#fff8dc",
+    color: "#5f4700",
+    fontWeight: 800,
+  },
 };
