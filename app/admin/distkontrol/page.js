@@ -1,38 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
-/* =========================================================
-   КУРС ПО УМОЛЧАНИЮ
-
-   Такой же, как сейчас стоит в калькуляторе.
-   Если курс был сохранён в калькуляторе,
-   сюда автоматически подставится сохранённый.
-========================================================= */
-
+const VAT = 1.2;
 const DEFAULT_RUB_BYN_RATE = "0,0365";
 
 /* =========================================================
    ПРАЙС DISTKONTROL
 
-   Цена priceRub — колонка:
+   priceRub — колонка:
    "Цены для ООО Спасибо до 31.12.2026 г."
-
-   recommendedRub — рекомендованная цена из Excel
-   discount — скидка из Excel
 ========================================================= */
 
 const PRODUCT_GROUPS = [
   {
     id: "usb-2",
     title: "DistKontrolUSB 2.0",
-    description:
-      "Устройства серии DistKontrolUSB",
+    description: "Устройства серии DistKontrolUSB",
     products: [
       {
         id: "distkontrolusb-16",
@@ -72,8 +57,7 @@ const PRODUCT_GROUPS = [
   {
     id: "usb-3",
     title: "DistKontrolUSB 3.0",
-    description:
-      "Устройства серии DistKontrolUSB 3.0",
+    description: "Устройства серии DistKontrolUSB 3.0",
     products: [
       {
         id: "distkontrolusb-4-3",
@@ -121,8 +105,7 @@ const PRODUCT_GROUPS = [
   {
     id: "pdu",
     title: "DistkontrolPDU",
-    description:
-      "Устройства распределения питания",
+    description: "Устройства распределения питания",
     products: [
       {
         id: "distkontrolpdu-8-1u",
@@ -170,8 +153,7 @@ const PRODUCT_GROUPS = [
   {
     id: "hub",
     title: "DistKontrolHUB",
-    description:
-      "Концентраторы DistKontrolHUB",
+    description: "Концентраторы DistKontrolHUB",
     products: [
       {
         id: "distkontrolhub-16",
@@ -211,8 +193,7 @@ const PRODUCT_GROUPS = [
   {
     id: "copy-2",
     title: "DistKontrolUSB Copy 2.0",
-    description:
-      "Устройства DistKontrolUSB Copy 2.0",
+    description: "Устройства DistKontrolUSB Copy 2.0",
     products: [
       {
         id: "distkontrolusb-16-copy-2",
@@ -252,8 +233,7 @@ const PRODUCT_GROUPS = [
   {
     id: "copy-3",
     title: "DistKontrolUSB Copy 3.0",
-    description:
-      "Устройства DistKontrolUSB Copy 3.0",
+    description: "Устройства DistKontrolUSB Copy 3.0",
     products: [
       {
         id: "distkontrolusb-8-copy-3",
@@ -293,8 +273,7 @@ const PRODUCT_GROUPS = [
   {
     id: "options",
     title: "Дополнительные опции",
-    description:
-      "Дополнительное оборудование и модули",
+    description: "Дополнительное оборудование и модули",
     products: [
       {
         id: "option-ethernet-1g",
@@ -345,12 +324,7 @@ const PRODUCT_GROUPS = [
 ========================================================= */
 
 function parseNumber(value) {
-  if (
-    value === null ||
-    value === undefined
-  ) {
-    return 0;
-  }
+  if (value === null || value === undefined) return 0;
 
   const cleaned = String(value)
     .replace(/\s/g, "")
@@ -359,15 +333,11 @@ function parseNumber(value) {
 
   const number = Number(cleaned);
 
-  return Number.isFinite(number)
-    ? number
-    : 0;
+  return Number.isFinite(number) ? number : 0;
 }
 
 function formatMoney(value) {
-  if (!Number.isFinite(value)) {
-    return "0,00";
-  }
+  if (!Number.isFinite(value)) return "0,00";
 
   return new Intl.NumberFormat("ru-RU", {
     minimumFractionDigits: 2,
@@ -376,9 +346,7 @@ function formatMoney(value) {
 }
 
 function formatRub(value) {
-  if (!Number.isFinite(value)) {
-    return "0";
-  }
+  if (!Number.isFinite(value)) return "0";
 
   return new Intl.NumberFormat("ru-RU", {
     maximumFractionDigits: 0,
@@ -386,9 +354,7 @@ function formatRub(value) {
 }
 
 function formatRate(value) {
-  if (!Number.isFinite(value)) {
-    return "—";
-  }
+  if (!Number.isFinite(value)) return "—";
 
   return new Intl.NumberFormat("ru-RU", {
     minimumFractionDigits: 4,
@@ -404,46 +370,30 @@ export default function DistKontrolPage() {
   const [rubBynInput, setRubBynInput] =
     useState(DEFAULT_RUB_BYN_RATE);
 
-  const [search, setSearch] =
-    useState("");
-
-  const [selected, setSelected] =
-    useState([]);
-
-  const [copied, setCopied] =
-    useState(false);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState([]);
+  const [copied, setCopied] = useState(false);
 
   /* =========================================================
-     ЗАГРУЖАЕМ КУРС ИЗ КАЛЬКУЛЯТОРА
+     КУРС ИЗ КАЛЬКУЛЯТОРА
   ========================================================= */
 
   function loadRateFromCalculator() {
-    if (typeof window === "undefined") {
-      return;
-    }
+    if (typeof window === "undefined") return;
 
-    const savedRate =
-      localStorage.getItem(
-        "calculator_rub_byn_rate"
-      );
+    const savedRate = localStorage.getItem(
+      "calculator_rub_byn_rate"
+    );
 
     if (savedRate) {
       setRubBynInput(savedRate);
     } else {
-      setRubBynInput(
-        DEFAULT_RUB_BYN_RATE
-      );
+      setRubBynInput(DEFAULT_RUB_BYN_RATE);
     }
   }
 
   useEffect(() => {
     loadRateFromCalculator();
-
-    /*
-      Если вернулись на вкладку DistKontrol
-      после изменения курса в калькуляторе,
-      курс перечитается.
-    */
 
     function handleFocus() {
       loadRateFromCalculator();
@@ -485,7 +435,7 @@ export default function DistKontrolPage() {
     parseNumber(rubBynInput);
 
   /* =========================================================
-     ФИЛЬТРАЦИЯ ПРАЙСА
+     ПОИСК
   ========================================================= */
 
   const filteredGroups =
@@ -499,20 +449,17 @@ export default function DistKontrolPage() {
       }
 
       return PRODUCT_GROUPS
-        .map((group) => {
-          const products =
+        .map((group) => ({
+          ...group,
+
+          products:
             group.products.filter(
               (product) =>
                 product.name
                   .toLowerCase()
                   .includes(query)
-            );
-
-          return {
-            ...group,
-            products,
-          };
-        })
+            ),
+        }))
         .filter(
           (group) =>
             group.products.length > 0
@@ -520,7 +467,7 @@ export default function DistKontrolPage() {
     }, [search]);
 
   /* =========================================================
-     ВЫБРАННЫЕ ПОЗИЦИИ
+     КОНФИГУРАЦИЯ
   ========================================================= */
 
   function addProduct(product) {
@@ -619,28 +566,40 @@ export default function DistKontrolPage() {
 
   /* =========================================================
      ИТОГИ
+
+     БЕЗ НДС:
+     RUB × курс
+
+     С НДС:
+     RUB × курс × 1.20
   ========================================================= */
 
   const totals = useMemo(() => {
     let rub = 0;
-    let byn = 0;
+    let withoutVat = 0;
+    let withVat = 0;
     let qty = 0;
 
     selected.forEach((item) => {
       const lineRub =
         item.priceRub * item.qty;
 
-      rub += lineRub;
-
-      byn +=
+      const lineWithoutVat =
         lineRub * rubBynRate;
 
+      const lineWithVat =
+        lineWithoutVat * VAT;
+
+      rub += lineRub;
+      withoutVat += lineWithoutVat;
+      withVat += lineWithVat;
       qty += item.qty;
     });
 
     return {
       rub,
-      byn,
+      withoutVat,
+      withVat,
       qty,
     };
   }, [
@@ -649,46 +608,71 @@ export default function DistKontrolPage() {
   ]);
 
   /* =========================================================
-     КОПИРОВАНИЕ СПЕЦИФИКАЦИИ
+     КОПИРОВАНИЕ
   ========================================================= */
 
   async function copyConfiguration() {
-    if (!selected.length) {
-      return;
-    }
+    if (!selected.length) return;
 
-    const lines = selected.map(
-      (item, index) => {
-        const lineRub =
-          item.priceRub * item.qty;
+    const lines =
+      selected.map(
+        (item, index) => {
+          const lineRub =
+            item.priceRub *
+            item.qty;
 
-        const lineByn =
-          lineRub * rubBynRate;
+          const unitWithoutVat =
+            item.priceRub *
+            rubBynRate;
 
-        return (
-          `${index + 1}. ${item.name}\n` +
-          `   ${item.qty} шт. × ${formatRub(
-            item.priceRub
-          )} RUB = ${formatRub(
-            lineRub
-          )} RUB / ${formatMoney(
-            lineByn
-          )} BYN`
-        );
-      }
-    );
+          const unitWithVat =
+            unitWithoutVat *
+            VAT;
+
+          const lineWithoutVat =
+            lineRub *
+            rubBynRate;
+
+          const lineWithVat =
+            lineWithoutVat *
+            VAT;
+
+          return [
+            `${index + 1}. ${item.name}`,
+            `Количество: ${item.qty} шт.`,
+            `Цена RUB: ${formatRub(
+              item.priceRub
+            )} RUB / шт.`,
+            `Без НДС: ${formatMoney(
+              unitWithoutVat
+            )} BYN / шт.`,
+            `С НДС: ${formatMoney(
+              unitWithVat
+            )} BYN / шт.`,
+            `Сумма без НДС: ${formatMoney(
+              lineWithoutVat
+            )} BYN`,
+            `Сумма с НДС: ${formatMoney(
+              lineWithVat
+            )} BYN`,
+            "",
+          ].join("\n");
+        }
+      );
 
     const text = [
       "DistKontrol — выбранная конфигурация",
       "",
       ...lines,
-      "",
-      `Итого позиций: ${totals.qty} шт.`,
+      `Всего товаров: ${totals.qty} шт.`,
       `Итого RUB: ${formatRub(
         totals.rub
       )} RUB`,
-      `Итого BYN: ${formatMoney(
-        totals.byn
+      `Итого без НДС: ${formatMoney(
+        totals.withoutVat
+      )} BYN`,
+      `Итого с НДС: ${formatMoney(
+        totals.withVat
       )} BYN`,
       `Курс RUB → BYN: ${formatRate(
         rubBynRate
@@ -733,14 +717,13 @@ export default function DistKontrolPage() {
         </div>
       </div>
 
-      {/* =====================================================
-          ПАНЕЛЬ КУРСА + ПОИСК
-      ===================================================== */}
+      {/* КУРС + ПОИСК */}
 
       <section style={styles.topCard}>
-        <div style={styles.topGrid}>
-          {/* КУРС */}
-
+        <div
+          className="dist-top-grid"
+          style={styles.topGrid}
+        >
           <div style={styles.rateBlock}>
             <div>
               <div style={styles.smallLabel}>
@@ -781,8 +764,6 @@ export default function DistKontrolPage() {
               </Link>
             </div>
           </div>
-
-          {/* ПОИСК */}
 
           <div>
             <label
@@ -830,22 +811,18 @@ export default function DistKontrolPage() {
         </div>
 
         <div style={styles.formulaNote}>
-          Цена BYN = цена для ООО
-          «Спасибо» в RUB × курс RUB → BYN
+          Без НДС = цена RUB × курс RUB → BYN
+          · С НДС = цена без НДС + 20% НДС
         </div>
       </section>
 
-      {/* =====================================================
-          ОСНОВНАЯ СЕТКА
-      ===================================================== */}
+      {/* ОСНОВНОЙ БЛОК */}
 
       <div
         className="distkontrol-layout"
         style={styles.mainGrid}
       >
-        {/* ===================================================
-            ПРАЙС
-        =================================================== */}
+        {/* ПРАЙС */}
 
         <div>
           {filteredGroups.length ? (
@@ -892,9 +869,7 @@ export default function DistKontrolPage() {
           )}
         </div>
 
-        {/* ===================================================
-            КОНФИГУРАЦИЯ
-        =================================================== */}
+        {/* КОНФИГУРАЦИЯ */}
 
         <div
           className="configuration-column"
@@ -976,8 +951,8 @@ export default function DistKontrolPage() {
                 >
                   Выбирай устройство,
                   концентратор и
-                  дополнительные опции из
-                  прайса слева.
+                  дополнительные опции
+                  из прайса слева.
                 </div>
               </div>
             ) : (
@@ -993,9 +968,21 @@ export default function DistKontrolPage() {
                         item.priceRub *
                         item.qty;
 
-                      const lineByn =
+                      const unitWithoutVat =
+                        item.priceRub *
+                        rubBynRate;
+
+                      const unitWithVat =
+                        unitWithoutVat *
+                        VAT;
+
+                      const lineWithoutVat =
                         lineRub *
                         rubBynRate;
+
+                      const lineWithVat =
+                        lineWithoutVat *
+                        VAT;
 
                       return (
                         <div
@@ -1056,27 +1043,66 @@ export default function DistKontrolPage() {
 
                           <div
                             style={
-                              styles.selectedPrice
+                              styles.selectedUnitPrices
                             }
                           >
-                            <span>
-                              {formatRub(
-                                item.priceRub
-                              )}{" "}
-                              RUB
-                            </span>
-
-                            <span
+                            <div
                               style={
-                                styles.selectedPriceByn
+                                styles.selectedUnitRow
                               }
                             >
-                              {formatMoney(
-                                item.priceRub *
-                                  rubBynRate
-                              )}{" "}
-                              BYN / шт.
-                            </span>
+                              <span>
+                                RUB
+                              </span>
+
+                              <strong>
+                                {formatRub(
+                                  item.priceRub
+                                )}
+                              </strong>
+                            </div>
+
+                            <div
+                              style={
+                                styles.selectedUnitRow
+                              }
+                            >
+                              <span>
+                                Без НДС
+                              </span>
+
+                              <strong
+                                style={
+                                  styles.selectedWithoutVatText
+                                }
+                              >
+                                {formatMoney(
+                                  unitWithoutVat
+                                )}{" "}
+                                BYN
+                              </strong>
+                            </div>
+
+                            <div
+                              style={
+                                styles.selectedUnitRow
+                              }
+                            >
+                              <span>
+                                С НДС
+                              </span>
+
+                              <strong
+                                style={
+                                  styles.selectedWithVatText
+                                }
+                              >
+                                {formatMoney(
+                                  unitWithVat
+                                )}{" "}
+                                BYN
+                              </strong>
+                            </div>
                           </div>
 
                           <div
@@ -1114,8 +1140,7 @@ export default function DistKontrolPage() {
                                 ) =>
                                   changeQty(
                                     item.id,
-                                    e
-                                      .target
+                                    e.target
                                       .value
                                   )
                                 }
@@ -1157,13 +1182,24 @@ export default function DistKontrolPage() {
 
                               <div
                                 style={
-                                  styles.lineTotalByn
+                                  styles.lineWithoutVat
                                 }
                               >
                                 {formatMoney(
-                                  lineByn
+                                  lineWithoutVat
                                 )}{" "}
-                                BYN
+                                BYN без НДС
+                              </div>
+
+                              <div
+                                style={
+                                  styles.lineWithVat
+                                }
+                              >
+                                {formatMoney(
+                                  lineWithVat
+                                )}{" "}
+                                BYN с НДС
                               </div>
                             </div>
                           </div>
@@ -1173,7 +1209,7 @@ export default function DistKontrolPage() {
                   )}
                 </div>
 
-                {/* ИТОГО */}
+                {/* ИТОГ */}
 
                 <div
                   style={
@@ -1213,33 +1249,77 @@ export default function DistKontrolPage() {
 
                   <div
                     style={
-                      styles.totalMain
+                      styles.totalPrices
                     }
                   >
                     <div
                       style={
-                        styles.totalMainLabel
+                        styles.totalWithoutVatBox
                       }
                     >
-                      Итого BYN
+                      <div>
+                        <div
+                          style={
+                            styles.totalPriceLabel
+                          }
+                        >
+                          Без НДС
+                        </div>
+
+                        <div
+                          style={
+                            styles.totalPriceHint
+                          }
+                        >
+                          RUB × курс
+                        </div>
+                      </div>
+
+                      <div
+                        style={
+                          styles.totalWithoutVat
+                        }
+                      >
+                        {formatMoney(
+                          totals.withoutVat
+                        )}{" "}
+                        BYN
+                      </div>
                     </div>
 
                     <div
                       style={
-                        styles.totalMainValue
+                        styles.totalWithVatBox
                       }
                     >
-                      {formatMoney(
-                        totals.byn
-                      )}
-                    </div>
+                      <div>
+                        <div
+                          style={
+                            styles.totalPriceLabel
+                          }
+                        >
+                          С НДС
+                        </div>
 
-                    <div
-                      style={
-                        styles.totalCurrency
-                      }
-                    >
-                      BYN
+                        <div
+                          style={
+                            styles.totalPriceHint
+                          }
+                        >
+                          + 20% НДС
+                        </div>
+                      </div>
+
+                      <div
+                        style={
+                          styles.totalWithVat
+                        }
+                      >
+                        {formatMoney(
+                          totals.withVat
+                        )}{" "}
+                        BYN
+                      </div>
                     </div>
                   </div>
 
@@ -1263,12 +1343,10 @@ export default function DistKontrolPage() {
         </div>
       </div>
 
-      {/* =====================================================
-          АДАПТИВ
-      ===================================================== */}
+      {/* АДАПТИВ */}
 
       <style jsx>{`
-        @media (max-width: 1250px) {
+        @media (max-width: 1300px) {
           .distkontrol-layout {
             grid-template-columns: 1fr !important;
           }
@@ -1279,33 +1357,41 @@ export default function DistKontrolPage() {
         }
 
         @media (max-width: 900px) {
-          .price-header,
-          .price-row {
-            grid-template-columns:
-              minmax(180px, 1fr)
-              110px
-              100px !important;
+          .dist-top-grid {
+            grid-template-columns: 1fr !important;
           }
 
-          .hide-mobile {
-            display: none !important;
-          }
-        }
-
-        @media (max-width: 650px) {
           .price-header {
             display: none !important;
           }
 
           .price-row {
-            grid-template-columns: 1fr !important;
+            grid-template-columns: 1fr 1fr !important;
             gap: 8px !important;
+            padding: 12px !important;
           }
 
-          .mobile-price-cell {
-            text-align: left !important;
-            border-left: none !important;
-            padding-left: 0 !important;
+          .price-name {
+            grid-column: 1 / -1;
+          }
+
+          .desktop-secondary {
+            display: none !important;
+          }
+
+          .add-cell {
+            grid-column: 1 / -1;
+          }
+        }
+
+        @media (max-width: 620px) {
+          .price-row {
+            grid-template-columns: 1fr !important;
+          }
+
+          .price-name,
+          .add-cell {
+            grid-column: auto;
           }
         }
       `}</style>
@@ -1314,7 +1400,7 @@ export default function DistKontrolPage() {
 }
 
 /* =========================================================
-   ГРУППА ПРАЙСА
+   ГРУППА ТОВАРОВ
 ========================================================= */
 
 function PriceGroup({
@@ -1332,7 +1418,9 @@ function PriceGroup({
           </div>
 
           <div
-            style={styles.groupDescription}
+            style={
+              styles.groupDescription
+            }
           >
             {group.description}
           </div>
@@ -1349,28 +1437,48 @@ function PriceGroup({
         className="price-header"
         style={styles.priceHeader}
       >
-        <div>Наименование</div>
+        <div>
+          Наименование
+        </div>
 
         <div
-          className="hide-mobile"
-          style={{ textAlign: "right" }}
+          style={{
+            textAlign: "right",
+          }}
         >
           Рекоменд.
         </div>
 
         <div
-          className="hide-mobile"
-          style={{ textAlign: "center" }}
+          style={{
+            textAlign: "center",
+          }}
         >
           Скидка
         </div>
 
-        <div style={{ textAlign: "right" }}>
+        <div
+          style={{
+            textAlign: "right",
+          }}
+        >
           Цена RUB
         </div>
 
-        <div style={{ textAlign: "right" }}>
-          Цена BYN
+        <div
+          style={
+            styles.withoutVatHeader
+          }
+        >
+          Без НДС
+        </div>
+
+        <div
+          style={
+            styles.withVatHeader
+          }
+        >
+          С НДС
         </div>
 
         <div />
@@ -1381,9 +1489,13 @@ function PriceGroup({
       <div>
         {group.products.map(
           (product) => {
-            const priceByn =
+            const priceWithoutVat =
               product.priceRub *
               rubBynRate;
+
+            const priceWithVat =
+              priceWithoutVat *
+              VAT;
 
             const selectedItem =
               selected.find(
@@ -1403,9 +1515,9 @@ function PriceGroup({
                     : {}),
                 }}
               >
-                {/* NAME */}
-
-                <div>
+                <div
+                  className="price-name"
+                >
                   <div
                     style={
                       styles.productName
@@ -1425,10 +1537,8 @@ function PriceGroup({
                   ) : null}
                 </div>
 
-                {/* RECOMMENDED */}
-
                 <div
-                  className="hide-mobile"
+                  className="desktop-secondary"
                   style={
                     styles.recommendedCell
                   }
@@ -1438,10 +1548,8 @@ function PriceGroup({
                   )}
                 </div>
 
-                {/* DISCOUNT */}
-
                 <div
-                  className="hide-mobile"
+                  className="desktop-secondary"
                   style={
                     styles.discountCell
                   }
@@ -1452,51 +1560,38 @@ function PriceGroup({
                     : "—"}
                 </div>
 
-                {/* RUB */}
-
                 <div
-                  className="mobile-price-cell"
                   style={
                     styles.rubPriceCell
                   }
                 >
-                  <span
-                    style={
-                      styles.mobileLabel
-                    }
-                  >
-                    RUB
-                  </span>
-
                   {formatRub(
                     product.priceRub
                   )}
                 </div>
 
-                {/* BYN */}
-
                 <div
-                  className="mobile-price-cell"
                   style={
-                    styles.bynPriceCell
+                    styles.withoutVatPriceCell
                   }
                 >
-                  <span
-                    style={
-                      styles.mobileLabel
-                    }
-                  >
-                    BYN
-                  </span>
-
                   {formatMoney(
-                    priceByn
+                    priceWithoutVat
                   )}
                 </div>
 
-                {/* ADD */}
+                <div
+                  style={
+                    styles.withVatPriceCell
+                  }
+                >
+                  {formatMoney(
+                    priceWithVat
+                  )}
+                </div>
 
                 <div
+                  className="add-cell"
                   style={
                     styles.addCell
                   }
@@ -1538,8 +1633,6 @@ const styles = {
     paddingBottom: 50,
   },
 
-  /* HEADER */
-
   pageHeader: {
     marginBottom: 14,
   },
@@ -1557,8 +1650,6 @@ const styles = {
     color: "#777",
     marginTop: 4,
   },
-
-  /* TOP */
 
   topCard: {
     background: "#fff",
@@ -1674,7 +1765,8 @@ const styles = {
     position: "absolute",
     top: "50%",
     right: 8,
-    transform: "translateY(-50%)",
+    transform:
+      "translateY(-50%)",
     width: 28,
     height: 28,
     border: "none",
@@ -1689,26 +1781,24 @@ const styles = {
   formulaNote: {
     marginTop: 10,
     paddingTop: 9,
-    borderTop: "1px solid #ececec",
+    borderTop:
+      "1px solid #ececec",
     fontSize: 10,
     color: "#888",
   },
 
-  /* MAIN */
-
   mainGrid: {
     display: "grid",
     gridTemplateColumns:
-      "minmax(0, 1fr) 350px",
+      "minmax(0, 1fr) 370px",
     alignItems: "start",
     gap: 14,
   },
 
-  /* GROUP */
-
   groupCard: {
     background: "#fff",
-    border: "1px solid #e2e2e2",
+    border:
+      "1px solid #e2e2e2",
     borderRadius: 12,
     overflow: "hidden",
     marginBottom: 12,
@@ -1719,10 +1809,12 @@ const styles = {
     padding: "12px 14px",
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     gap: 12,
     background: "#fafafa",
-    borderBottom: "1px solid #e7e7e7",
+    borderBottom:
+      "1px solid #e7e7e7",
   },
 
   groupTitle: {
@@ -1747,35 +1839,51 @@ const styles = {
     whiteSpace: "nowrap",
   },
 
-  /* PRICE TABLE */
-
   priceHeader: {
     display: "grid",
     gridTemplateColumns:
-      "minmax(210px, 1.65fr) 110px 70px 110px 110px 105px",
+      "minmax(210px, 1.5fr) 90px 60px 95px 110px 110px 100px",
     alignItems: "center",
     gap: 8,
-    minHeight: 34,
+    minHeight: 36,
     padding: "0 12px",
     boxSizing: "border-box",
     background: "#f5f5f5",
-    borderBottom: "1px solid #e3e3e3",
+    borderBottom:
+      "1px solid #e3e3e3",
     fontSize: 9,
     fontWeight: 750,
     color: "#777",
     textTransform: "uppercase",
   },
 
+  withoutVatHeader: {
+    textAlign: "right",
+    color: "#24728f",
+    background: "#d5f0fa",
+    padding: "7px 6px",
+    borderRadius: 5,
+  },
+
+  withVatHeader: {
+    textAlign: "right",
+    color: "#50793d",
+    background: "#dff3d3",
+    padding: "7px 6px",
+    borderRadius: 5,
+  },
+
   priceRow: {
     display: "grid",
     gridTemplateColumns:
-      "minmax(210px, 1.65fr) 110px 70px 110px 110px 105px",
+      "minmax(210px, 1.5fr) 90px 60px 95px 110px 110px 100px",
     alignItems: "center",
     gap: 8,
-    minHeight: 59,
+    minHeight: 62,
     padding: "8px 12px",
     boxSizing: "border-box",
-    borderBottom: "1px solid #ededed",
+    borderBottom:
+      "1px solid #ededed",
   },
 
   optionRow: {
@@ -1805,7 +1913,8 @@ const styles = {
     textAlign: "right",
     fontSize: 11,
     color: "#8a8a8a",
-    textDecoration: "line-through",
+    textDecoration:
+      "line-through",
   },
 
   discountCell: {
@@ -1822,15 +1931,24 @@ const styles = {
     color: "#333",
   },
 
-  bynPriceCell: {
+  withoutVatPriceCell: {
     textAlign: "right",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 800,
-    color: "#111",
+    color: "#185f7a",
+    background: "#eef9fd",
+    padding: "8px 7px",
+    borderRadius: 6,
   },
 
-  mobileLabel: {
-    display: "none",
+  withVatPriceCell: {
+    textAlign: "right",
+    fontSize: 12,
+    fontWeight: 800,
+    color: "#426d31",
+    background: "#f3faef",
+    padding: "8px 7px",
+    borderRadius: 6,
   },
 
   addCell: {
@@ -1841,7 +1959,8 @@ const styles = {
   addButton: {
     minWidth: 92,
     height: 32,
-    border: "1px solid #d1d1d1",
+    border:
+      "1px solid #d1d1d1",
     borderRadius: 7,
     background: "#fff",
     color: "#222",
@@ -1853,12 +1972,11 @@ const styles = {
   },
 
   addButtonSelected: {
-    border: "1px solid #cbdac3",
+    border:
+      "1px solid #cbdac3",
     background: "#f2f8ef",
     color: "#46643d",
   },
-
-  /* CONFIG */
 
   configurationColumn: {
     position: "sticky",
@@ -1867,7 +1985,8 @@ const styles = {
 
   configurationCard: {
     background: "#fff",
-    border: "1px solid #dddddd",
+    border:
+      "1px solid #dddddd",
     borderRadius: 12,
     overflow: "hidden",
     boxShadow:
@@ -1876,11 +1995,13 @@ const styles = {
 
   configurationHeader: {
     display: "flex",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     alignItems: "flex-start",
     gap: 10,
     padding: 14,
-    borderBottom: "1px solid #e7e7e7",
+    borderBottom:
+      "1px solid #e7e7e7",
   },
 
   configurationTitle: {
@@ -1904,8 +2025,6 @@ const styles = {
     cursor: "pointer",
     textDecoration: "underline",
   },
-
-  /* EMPTY CART */
 
   emptyCart: {
     padding: "45px 25px",
@@ -1939,23 +2058,24 @@ const styles = {
     color: "#999",
   },
 
-  /* SELECTED */
-
   selectedList: {
-    maxHeight: "calc(100vh - 390px)",
+    maxHeight:
+      "calc(100vh - 390px)",
     minHeight: 90,
     overflowY: "auto",
   },
 
   selectedItem: {
     padding: "11px 12px",
-    borderBottom: "1px solid #eeeeee",
+    borderBottom:
+      "1px solid #eeeeee",
   },
 
   selectedItemTop: {
     display: "flex",
     alignItems: "flex-start",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     gap: 7,
   },
 
@@ -1986,35 +2106,50 @@ const styles = {
     lineHeight: 1,
   },
 
-  selectedPrice: {
+  selectedUnitPrices: {
+    display: "grid",
+    gap: 4,
+    marginTop: 9,
+    padding: 8,
+    borderRadius: 7,
+    background: "#fafafa",
+    border:
+      "1px solid #eeeeee",
+  },
+
+  selectedUnitRow: {
     display: "flex",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: 8,
-    marginTop: 8,
+    justifyContent:
+      "space-between",
+    alignItems: "center",
+    gap: 10,
     fontSize: 9,
     color: "#777",
   },
 
-  selectedPriceByn: {
-    fontWeight: 700,
-    color: "#555",
-    textAlign: "right",
+  selectedWithoutVatText: {
+    color: "#185f7a",
+  },
+
+  selectedWithVatText: {
+    color: "#426d31",
   },
 
   qtyAndTotal: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     gap: 10,
-    marginTop: 8,
+    marginTop: 9,
   },
 
   qtyControl: {
     display: "flex",
     alignItems: "center",
     height: 30,
-    border: "1px solid #d8d8d8",
+    border:
+      "1px solid #d8d8d8",
     borderRadius: 7,
     overflow: "hidden",
   },
@@ -2033,8 +2168,10 @@ const styles = {
     width: 37,
     height: 28,
     border: "none",
-    borderLeft: "1px solid #e0e0e0",
-    borderRight: "1px solid #e0e0e0",
+    borderLeft:
+      "1px solid #e0e0e0",
+    borderRight:
+      "1px solid #e0e0e0",
     textAlign: "center",
     fontSize: 11,
     fontWeight: 700,
@@ -2051,14 +2188,19 @@ const styles = {
     color: "#888",
   },
 
-  lineTotalByn: {
-    marginTop: 1,
-    fontSize: 12,
-    fontWeight: 800,
-    color: "#222",
+  lineWithoutVat: {
+    marginTop: 2,
+    fontSize: 9,
+    fontWeight: 700,
+    color: "#24728f",
   },
 
-  /* TOTAL */
+  lineWithVat: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: 800,
+    color: "#426d31",
+  },
 
   totalBlock: {
     padding: 13,
@@ -2068,41 +2210,73 @@ const styles = {
   totalSmallRow: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     gap: 10,
     marginBottom: 6,
     fontSize: 9,
     color: "#777",
   },
 
-  totalMain: {
+  totalPrices: {
     display: "grid",
-    gridTemplateColumns:
-      "1fr auto auto",
-    gap: 5,
-    alignItems: "baseline",
+    gap: 7,
     marginTop: 10,
     paddingTop: 10,
-    borderTop: "1px solid #dedede",
+    borderTop:
+      "1px solid #dedede",
   },
 
-  totalMainLabel: {
+  totalWithoutVatBox: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent:
+      "space-between",
+    gap: 10,
+    padding: 10,
+    borderRadius: 8,
+    border:
+      "1px solid #cfe9f2",
+    background: "#eef9fd",
+  },
+
+  totalWithVatBox: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent:
+      "space-between",
+    gap: 10,
+    padding: 10,
+    borderRadius: 8,
+    border:
+      "1px solid #d5e8cb",
+    background: "#f3faef",
+  },
+
+  totalPriceLabel: {
     fontSize: 11,
-    fontWeight: 750,
+    fontWeight: 800,
     color: "#333",
   },
 
-  totalMainValue: {
-    fontSize: 23,
-    lineHeight: 1.1,
-    fontWeight: 850,
-    color: "#111",
+  totalPriceHint: {
+    marginTop: 2,
+    fontSize: 8,
+    color: "#999",
   },
 
-  totalCurrency: {
-    fontSize: 9,
-    fontWeight: 750,
-    color: "#777",
+  totalWithoutVat: {
+    fontSize: 17,
+    fontWeight: 850,
+    color: "#185f7a",
+    textAlign: "right",
+  },
+
+  totalWithVat: {
+    fontSize: 19,
+    fontWeight: 850,
+    color: "#426d31",
+    textAlign: "right",
   },
 
   copyConfigurationButton: {
@@ -2118,12 +2292,11 @@ const styles = {
     fontWeight: 700,
   },
 
-  /* SEARCH EMPTY */
-
   emptySearch: {
     padding: 45,
     textAlign: "center",
-    border: "1px solid #e2e2e2",
+    border:
+      "1px solid #e2e2e2",
     borderRadius: 12,
     background: "#fff",
   },
