@@ -12,7 +12,8 @@ const items = [
   { href: "/admin/analytics", label: "Аналитика" },
   { href: "/admin/brands", label: "Бренды" },
   { href: "/admin/settings", label: "Настройки" },
-  { href: "/admin/calculator", label: "Калькулятор" }
+  { href: "/admin/calculator", label: "Калькулятор" },
+  { href: "/admin/distkontrol", label: "DistKontrol" },
 ];
 
 export default function AdminSidebar() {
@@ -26,14 +27,25 @@ export default function AdminSidebar() {
         borderRight: "1px solid #e5e5e5",
         background: "#fff",
         padding: 16,
-        boxSizing: "border-box"
+        boxSizing: "border-box",
       }}
     >
-      <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
+      <div
+        style={{
+          fontSize: 20,
+          fontWeight: 700,
+          marginBottom: 16,
+        }}
+      >
         Админка
       </div>
 
-      <div style={{ display: "grid", gap: 8 }}>
+      <div
+        style={{
+          display: "grid",
+          gap: 8,
+        }}
+      >
         {items.map((item) => {
           const active =
             item.href === "/admin"
@@ -50,8 +62,10 @@ export default function AdminSidebar() {
                 borderRadius: 10,
                 textDecoration: "none",
                 color: "#111",
-                background: active ? "#f3f3f3" : "#fff",
-                fontSize: 14
+                background: active
+                  ? "#f3f3f3"
+                  : "#fff",
+                fontSize: 14,
               }}
             >
               {item.label}
