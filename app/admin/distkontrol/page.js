@@ -367,16 +367,23 @@ export default function DistKontrolPage() {
   const [rubBynInput, setRubBynInput] =
     useState(DEFAULT_RUB_BYN_RATE);
 
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState([]);
-  const [copied, setCopied] = useState(false);
+  const [search, setSearch] =
+    useState("");
+
+  const [selected, setSelected] =
+    useState([]);
+
+  const [copied, setCopied] =
+    useState(false);
 
   /* =========================================================
      КУРС ИЗ КАЛЬКУЛЯТОРА
   ========================================================= */
 
   function loadRateFromCalculator() {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      return;
+    }
 
     const savedRate =
       localStorage.getItem(
@@ -496,6 +503,7 @@ export default function DistKontrolPage() {
         {
           ...product,
           qty: 1,
+          markup: "0",
         },
       ];
     });
@@ -555,6 +563,24 @@ export default function DistKontrolPage() {
     );
   }
 
+  function changeMarkup(id, value) {
+    const cleaned =
+      String(value)
+        .replace(",", ".")
+        .replace(/[^\d.-]/g, "");
+
+    setSelected((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              markup: cleaned,
+            }
+          : item
+      )
+    );
+  }
+
   function removeProduct(id) {
     setSelected((current) =>
       current.filter(
@@ -570,6 +596,15 @@ export default function DistKontrolPage() {
 
   /* =========================================================
      ИТОГИ
+
+     Сначала:
+     RUB × курс = базовая цена без НДС
+
+     Потом:
+     + индивидуальная наценка
+
+     Потом:
+     + 20% НДС
   ========================================================= */
 
   const totals =
@@ -584,9 +619,18 @@ export default function DistKontrolPage() {
             item.priceRub *
             item.qty;
 
-          const lineWithoutVat =
+          const baseWithoutVat =
             lineRub *
             rubBynRate;
+
+          const markup =
+            parseNumber(
+              item.markup
+            );
+
+          const lineWithoutVat =
+            baseWithoutVat *
+            (1 + markup / 100);
 
           const lineWithVat =
             lineWithoutVat *
@@ -613,7 +657,7 @@ export default function DistKontrolPage() {
     ]);
 
   /* =========================================================
-     КОПИРОВАНИЕ
+     COPY
 
      Только:
      Наименование — количество
@@ -622,7 +666,9 @@ export default function DistKontrolPage() {
   ========================================================= */
 
   async function copyConfiguration() {
-    if (!selected.length) return;
+    if (!selected.length) {
+      return;
+    }
 
     const lines =
       selected.map(
@@ -684,7 +730,9 @@ export default function DistKontrolPage() {
           style={styles.topGrid}
         >
           <div
-            style={styles.rateBlock}
+            style={
+              styles.rateBlock
+            }
           >
             <div>
               <div
@@ -792,8 +840,9 @@ export default function DistKontrolPage() {
             styles.formulaNote
           }
         >
-          Без НДС = цена RUB × курс RUB → BYN
-          · С НДС = цена без НДС + 20% НДС
+          Базовая цена без НДС = RUB × курс.
+          В выбранной конфигурации можно добавить
+          индивидуальную наценку к каждой позиции.
         </div>
       </section>
 
@@ -928,7 +977,7 @@ export default function DistKontrolPage() {
           </div>
         ) : (
           <>
-            {/* HEADER TABLE */}
+            {/* TABLE HEADER */}
 
             <div
               className="config-header-row"
@@ -947,6 +996,15 @@ export default function DistKontrolPage() {
                 }}
               >
                 Кол-во
+              </div>
+
+              <div
+                style={{
+                  textAlign:
+                    "center",
+                }}
+              >
+                Наценка
               </div>
 
               <div
@@ -979,9 +1037,20 @@ export default function DistKontrolPage() {
                     item.priceRub *
                     item.qty;
 
-                  const lineWithoutVat =
+                  const baseWithoutVat =
                     lineRub *
                     rubBynRate;
+
+                  const markup =
+                    parseNumber(
+                      item.markup
+                    );
+
+                  const lineWithoutVat =
+                    baseWithoutVat *
+                    (1 +
+                      markup /
+                        100);
 
                   const lineWithVat =
                     lineWithoutVat *
@@ -989,7 +1058,9 @@ export default function DistKontrolPage() {
 
                   return (
                     <div
-                      key={item.id}
+                      key={
+                        item.id
+                      }
                       className="config-row"
                       style={
                         styles.configRow
@@ -1086,6 +1157,50 @@ export default function DistKontrolPage() {
                         </div>
                       </div>
 
+                      {/* MARKUP */}
+
+                      <div
+                        style={
+                          styles.markupCell
+                        }
+                      >
+                        <div
+                          style={
+                            styles.markupWrapper
+                          }
+                        >
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={
+                              item.markup ??
+                              "0"
+                            }
+                            onChange={(
+                              e
+                            ) =>
+                              changeMarkup(
+                                item.id,
+                                e.target
+                                  .value
+                              )
+                            }
+                            style={
+                              styles.markupInput
+                            }
+                            placeholder="0"
+                          />
+
+                          <div
+                            style={
+                              styles.markupSuffix
+                            }
+                          >
+                            %
+                          </div>
+                        </div>
+                      </div>
+
                       {/* WITHOUT VAT */}
 
                       <div
@@ -1140,9 +1255,7 @@ export default function DistKontrolPage() {
               )}
             </div>
 
-            {/* =================================================
-                ИТОГ
-            ================================================= */}
+            {/* SUMMARY */}
 
             <div
               className="bottom-summary"
@@ -1230,7 +1343,7 @@ export default function DistKontrolPage() {
       ===================================================== */}
 
       <style jsx>{`
-        @media (max-width: 900px) {
+        @media (max-width: 1000px) {
           .dist-top-grid {
             grid-template-columns: 1fr !important;
           }
@@ -1261,16 +1374,6 @@ export default function DistKontrolPage() {
               1 / -1;
           }
 
-          .bottom-summary {
-            flex-direction:
-              column !important;
-          }
-
-          .bottom-totals {
-            grid-template-columns:
-              1fr !important;
-          }
-
           .config-header-row {
             display:
               none !important;
@@ -1279,7 +1382,17 @@ export default function DistKontrolPage() {
           .config-row {
             grid-template-columns:
               1fr !important;
-            gap: 9px !important;
+            gap: 10px !important;
+          }
+
+          .bottom-summary {
+            flex-direction:
+              column !important;
+          }
+
+          .bottom-totals {
+            grid-template-columns:
+              1fr !important;
           }
         }
       `}</style>
@@ -1334,8 +1447,6 @@ function PriceGroup({
           {group.products.length} поз.
         </div>
       </div>
-
-      {/* HEADER */}
 
       <div
         className="price-header"
@@ -1392,8 +1503,6 @@ function PriceGroup({
 
         <div />
       </div>
-
-      {/* ROWS */}
 
       <div>
         {group.products.map(
@@ -2016,7 +2125,7 @@ const styles = {
     display: "grid",
 
     gridTemplateColumns:
-      "minmax(260px, 1fr) 150px 180px 180px 40px",
+      "minmax(250px, 1fr) 140px 110px 170px 170px 40px",
 
     alignItems: "center",
 
@@ -2043,13 +2152,13 @@ const styles = {
     display: "grid",
 
     gridTemplateColumns:
-      "minmax(260px, 1fr) 150px 180px 180px 40px",
+      "minmax(250px, 1fr) 140px 110px 170px 170px 40px",
 
     alignItems: "center",
 
     gap: 12,
 
-    minHeight: 60,
+    minHeight: 62,
 
     padding: "9px 14px",
 
@@ -2073,6 +2182,58 @@ const styles = {
     display: "flex",
     justifyContent:
       "center",
+  },
+
+  /* MARKUP */
+
+  markupCell: {
+    display: "flex",
+    justifyContent:
+      "center",
+  },
+
+  markupWrapper: {
+    width: 84,
+    height: 30,
+    display: "flex",
+    alignItems: "center",
+    border:
+      "1px solid #e2d39d",
+    borderRadius: 7,
+    overflow: "hidden",
+    background: "#fff8df",
+  },
+
+  markupInput: {
+    width: "100%",
+    height: 28,
+    border: "none",
+    outline: "none",
+    background:
+      "transparent",
+    textAlign: "center",
+    padding: "0 5px",
+    boxSizing:
+      "border-box",
+    fontSize: 11,
+    fontWeight: 800,
+    color: "#6c5600",
+  },
+
+  markupSuffix: {
+    width: 27,
+    height: 28,
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent:
+      "center",
+    borderLeft:
+      "1px solid #e2d39d",
+    background: "#fff1bd",
+    fontSize: 10,
+    fontWeight: 800,
+    color: "#7a6100",
   },
 
   configWithoutVat: {
