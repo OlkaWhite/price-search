@@ -603,24 +603,35 @@ export default function DistKontrolPage() {
   ========================================================= */
 
   async function copyConfiguration() {
-    if (!selected.length) return;
+  if (!selected.length) return;
 
-    const lines = selected.map(
-      (item) => {
-        const lineRub =
-          item.priceRub * item.qty;
+  const lines = selected.map((item) => {
+    return `${item.name} — ${item.qty} шт.`;
+  });
 
-        const lineWithoutVat =
-          lineRub * rubBynRate;
+  const text = [
+    ...lines,
+    "",
+    `Итого с НДС: ${formatMoney(
+      totals.withVat
+    )} BYN`,
+  ].join("\n");
 
-        const lineWithVat =
-          lineWithoutVat * VAT;
+  try {
+    await navigator.clipboard.writeText(text);
 
-        return `${item.name} — ${formatMoney(
-          lineWithVat
-        )} BYN`;
-      }
+    setCopied(true);
+
+    setTimeout(() => {
+      setCopied(false);
+    }, 1800);
+  } catch (error) {
+    console.error(
+      "Ошибка копирования:",
+      error
     );
+  }
+}
 
     const text = lines.join("\n");
 
