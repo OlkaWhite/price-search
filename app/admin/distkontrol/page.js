@@ -8,9 +8,6 @@ const DEFAULT_RUB_BYN_RATE = "0,0365";
 
 /* =========================================================
    ПРАЙС DISTKONTROL
-
-   priceRub — колонка:
-   "Цены для ООО Спасибо до 31.12.2026 г."
 ========================================================= */
 
 const PRODUCT_GROUPS = [
@@ -400,71 +397,40 @@ export default function DistKontrolPage() {
     }
 
     function handleStorage(event) {
-      if (
-        event.key ===
-        "calculator_rub_byn_rate"
-      ) {
+      if (event.key === "calculator_rub_byn_rate") {
         loadRateFromCalculator();
       }
     }
 
-    window.addEventListener(
-      "focus",
-      handleFocus
-    );
-
-    window.addEventListener(
-      "storage",
-      handleStorage
-    );
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("storage", handleStorage);
 
     return () => {
-      window.removeEventListener(
-        "focus",
-        handleFocus
-      );
-
-      window.removeEventListener(
-        "storage",
-        handleStorage
-      );
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
-  const rubBynRate =
-    parseNumber(rubBynInput);
+  const rubBynRate = parseNumber(rubBynInput);
 
   /* =========================================================
      ПОИСК
   ========================================================= */
 
-  const filteredGroups =
-    useMemo(() => {
-      const query = search
-        .trim()
-        .toLowerCase();
+  const filteredGroups = useMemo(() => {
+    const query = search.trim().toLowerCase();
 
-      if (!query) {
-        return PRODUCT_GROUPS;
-      }
+    if (!query) return PRODUCT_GROUPS;
 
-      return PRODUCT_GROUPS
-        .map((group) => ({
-          ...group,
-
-          products:
-            group.products.filter(
-              (product) =>
-                product.name
-                  .toLowerCase()
-                  .includes(query)
-            ),
-        }))
-        .filter(
-          (group) =>
-            group.products.length > 0
-        );
-    }, [search]);
+    return PRODUCT_GROUPS
+      .map((group) => ({
+        ...group,
+        products: group.products.filter((product) =>
+          product.name.toLowerCase().includes(query)
+        ),
+      }))
+      .filter((group) => group.products.length > 0);
+  }, [search]);
 
   /* =========================================================
      КОНФИГУРАЦИЯ
@@ -472,11 +438,9 @@ export default function DistKontrolPage() {
 
   function addProduct(product) {
     setSelected((current) => {
-      const existing =
-        current.find(
-          (item) =>
-            item.id === product.id
-        );
+      const existing = current.find(
+        (item) => item.id === product.id
+      );
 
       if (existing) {
         return current.map((item) =>
@@ -523,20 +487,14 @@ export default function DistKontrolPage() {
               }
             : item
         )
-        .filter(
-          (item) => item.qty > 0
-        )
+        .filter((item) => item.qty > 0)
     );
   }
 
   function changeQty(id, value) {
-    const parsed =
-      parseInt(value, 10);
+    const parsed = parseInt(value, 10);
 
-    if (
-      !Number.isFinite(parsed) ||
-      parsed < 1
-    ) {
+    if (!Number.isFinite(parsed) || parsed < 1) {
       return;
     }
 
@@ -554,9 +512,7 @@ export default function DistKontrolPage() {
 
   function removeProduct(id) {
     setSelected((current) =>
-      current.filter(
-        (item) => item.id !== id
-      )
+      current.filter((item) => item.id !== id)
     );
   }
 
@@ -566,16 +522,9 @@ export default function DistKontrolPage() {
 
   /* =========================================================
      ИТОГИ
-
-     БЕЗ НДС:
-     RUB × курс
-
-     С НДС:
-     RUB × курс × 1.20
   ========================================================= */
 
   const totals = useMemo(() => {
-    let rub = 0;
     let withoutVat = 0;
     let withVat = 0;
     let qty = 0;
@@ -590,99 +539,62 @@ export default function DistKontrolPage() {
       const lineWithVat =
         lineWithoutVat * VAT;
 
-      rub += lineRub;
       withoutVat += lineWithoutVat;
       withVat += lineWithVat;
       qty += item.qty;
     });
 
     return {
-      rub,
       withoutVat,
       withVat,
       qty,
     };
-  }, [
-    selected,
-    rubBynRate,
-  ]);
+  }, [selected, rubBynRate]);
 
   /* =========================================================
      КОПИРОВАНИЕ
+
+     Только:
+     - наименование
+     - количество
+     - сумма без НДС
+     - сумма с НДС
+     - итог
   ========================================================= */
 
   async function copyConfiguration() {
     if (!selected.length) return;
 
-    const lines =
-      selected.map(
-        (item, index) => {
-          const lineRub =
-            item.priceRub *
-            item.qty;
+    const lines = selected.map((item) => {
+      const lineRub =
+        item.priceRub * item.qty;
 
-          const unitWithoutVat =
-            item.priceRub *
-            rubBynRate;
+      const lineWithoutVat =
+        lineRub * rubBynRate;
 
-          const unitWithVat =
-            unitWithoutVat *
-            VAT;
+      const lineWithVat =
+        lineWithoutVat * VAT;
 
-          const lineWithoutVat =
-            lineRub *
-            rubBynRate;
-
-          const lineWithVat =
-            lineWithoutVat *
-            VAT;
-
-          return [
-            `${index + 1}. ${item.name}`,
-            `Количество: ${item.qty} шт.`,
-            `Цена RUB: ${formatRub(
-              item.priceRub
-            )} RUB / шт.`,
-            `Без НДС: ${formatMoney(
-              unitWithoutVat
-            )} BYN / шт.`,
-            `С НДС: ${formatMoney(
-              unitWithVat
-            )} BYN / шт.`,
-            `Сумма без НДС: ${formatMoney(
-              lineWithoutVat
-            )} BYN`,
-            `Сумма с НДС: ${formatMoney(
-              lineWithVat
-            )} BYN`,
-            "",
-          ].join("\n");
-        }
-      );
+      return [
+        `${item.name} — ${item.qty} шт.`,
+        `Без НДС: ${formatMoney(lineWithoutVat)} BYN`,
+        `С НДС: ${formatMoney(lineWithVat)} BYN`,
+        "",
+      ].join("\n");
+    });
 
     const text = [
-      "DistKontrol — выбранная конфигурация",
-      "",
       ...lines,
-      `Всего товаров: ${totals.qty} шт.`,
-      `Итого RUB: ${formatRub(
-        totals.rub
-      )} RUB`,
       `Итого без НДС: ${formatMoney(
         totals.withoutVat
       )} BYN`,
       `Итого с НДС: ${formatMoney(
         totals.withVat
       )} BYN`,
-      `Курс RUB → BYN: ${formatRate(
-        rubBynRate
-      )}`,
     ].join("\n");
 
     try {
-      await navigator.clipboard.writeText(
-        text
-      );
+      await navigator.clipboard.writeText(text);
 
       setCopied(true);
 
@@ -731,9 +643,7 @@ export default function DistKontrolPage() {
               </div>
 
               <div style={styles.rateValue}>
-                {formatRate(
-                  rubBynRate
-                )}
+                {formatRate(rubBynRate)}
               </div>
 
               <div style={styles.rateHint}>
@@ -744,21 +654,15 @@ export default function DistKontrolPage() {
             <div style={styles.rateActions}>
               <button
                 type="button"
-                onClick={
-                  loadRateFromCalculator
-                }
-                style={
-                  styles.secondaryButton
-                }
+                onClick={loadRateFromCalculator}
+                style={styles.secondaryButton}
               >
                 Обновить курс
               </button>
 
               <Link
                 href="/admin/calculator"
-                style={
-                  styles.calculatorLink
-                }
+                style={styles.calculatorLink}
               >
                 Открыть калькулятор
               </Link>
@@ -766,42 +670,26 @@ export default function DistKontrolPage() {
           </div>
 
           <div>
-            <label
-              style={
-                styles.searchLabel
-              }
-            >
+            <label style={styles.searchLabel}>
               Поиск по модели
             </label>
 
-            <div
-              style={
-                styles.searchWrapper
-              }
-            >
+            <div style={styles.searchWrapper}>
               <input
                 type="text"
                 value={search}
                 onChange={(e) =>
-                  setSearch(
-                    e.target.value
-                  )
+                  setSearch(e.target.value)
                 }
                 placeholder="Например: HUB-16, USB-32, Ethernet..."
-                style={
-                  styles.searchInput
-                }
+                style={styles.searchInput}
               />
 
               {search ? (
                 <button
                   type="button"
-                  onClick={() =>
-                    setSearch("")
-                  }
-                  style={
-                    styles.clearSearchButton
-                  }
+                  onClick={() => setSearch("")}
+                  style={styles.clearSearchButton}
                 >
                   ×
                 </button>
@@ -826,81 +714,44 @@ export default function DistKontrolPage() {
 
         <div>
           {filteredGroups.length ? (
-            filteredGroups.map(
-              (group) => (
-                <PriceGroup
-                  key={group.id}
-                  group={group}
-                  rubBynRate={
-                    rubBynRate
-                  }
-                  selected={
-                    selected
-                  }
-                  onAdd={
-                    addProduct
-                  }
-                />
-              )
-            )
+            filteredGroups.map((group) => (
+              <PriceGroup
+                key={group.id}
+                group={group}
+                rubBynRate={rubBynRate}
+                selected={selected}
+                onAdd={addProduct}
+              />
+            ))
           ) : (
-            <section
-              style={
-                styles.emptySearch
-              }
-            >
-              <div
-                style={
-                  styles.emptySearchTitle
-                }
-              >
+            <section style={styles.emptySearch}>
+              <div style={styles.emptySearchTitle}>
                 Ничего не найдено
               </div>
 
-              <div
-                style={
-                  styles.emptySearchText
-                }
-              >
-                Попробуй изменить
-                поисковый запрос.
+              <div style={styles.emptySearchText}>
+                Попробуй изменить поисковый запрос.
               </div>
             </section>
           )}
         </div>
 
-        {/* КОНФИГУРАЦИЯ */}
+        {/* ===================================================
+            ВЫБРАННАЯ КОНФИГУРАЦИЯ
+        =================================================== */}
 
         <div
           className="configuration-column"
-          style={
-            styles.configurationColumn
-          }
+          style={styles.configurationColumn}
         >
-          <section
-            style={
-              styles.configurationCard
-            }
-          >
-            <div
-              style={
-                styles.configurationHeader
-              }
-            >
+          <section style={styles.configurationCard}>
+            <div style={styles.configurationHeader}>
               <div>
-                <div
-                  style={
-                    styles.configurationTitle
-                  }
-                >
+                <div style={styles.configurationTitle}>
                   Выбранная конфигурация
                 </div>
 
-                <div
-                  style={
-                    styles.configurationSubtitle
-                  }
-                >
+                <div style={styles.configurationSubtitle}>
                   {selected.length
                     ? `${selected.length} поз. · ${totals.qty} шт.`
                     : "Позиции ещё не выбраны"}
@@ -910,12 +761,8 @@ export default function DistKontrolPage() {
               {selected.length ? (
                 <button
                   type="button"
-                  onClick={
-                    clearConfiguration
-                  }
-                  style={
-                    styles.clearButton
-                  }
+                  onClick={clearConfiguration}
+                  style={styles.clearButton}
                 >
                   Очистить
                 </button>
@@ -923,304 +770,227 @@ export default function DistKontrolPage() {
             </div>
 
             {!selected.length ? (
-              <div
-                style={
-                  styles.emptyCart
-                }
-              >
-                <div
-                  style={
-                    styles.emptyCartIcon
-                  }
-                >
+              <div style={styles.emptyCart}>
+                <div style={styles.emptyCartIcon}>
                   +
                 </div>
 
-                <div
-                  style={
-                    styles.emptyCartTitle
-                  }
-                >
+                <div style={styles.emptyCartTitle}>
                   Добавь оборудование
                 </div>
 
-                <div
-                  style={
-                    styles.emptyCartText
-                  }
-                >
-                  Выбирай устройство,
-                  концентратор и
-                  дополнительные опции
-                  из прайса слева.
+                <div style={styles.emptyCartText}>
+                  Выбирай основное оборудование
+                  и дополнительные опции из прайса.
                 </div>
               </div>
             ) : (
               <>
-                <div
-                  style={
-                    styles.selectedList
-                  }
-                >
-                  {selected.map(
-                    (item) => {
-                      const lineRub =
-                        item.priceRub *
-                        item.qty;
+                <div style={styles.selectedList}>
+                  {selected.map((item) => {
+                    const lineRub =
+                      item.priceRub *
+                      item.qty;
 
-                      const unitWithoutVat =
-                        item.priceRub *
-                        rubBynRate;
+                    const unitWithoutVat =
+                      item.priceRub *
+                      rubBynRate;
 
-                      const unitWithVat =
-                        unitWithoutVat *
-                        VAT;
+                    const unitWithVat =
+                      unitWithoutVat *
+                      VAT;
 
-                      const lineWithoutVat =
-                        lineRub *
-                        rubBynRate;
+                    const lineWithoutVat =
+                      lineRub *
+                      rubBynRate;
 
-                      const lineWithVat =
-                        lineWithoutVat *
-                        VAT;
+                    const lineWithVat =
+                      lineWithoutVat *
+                      VAT;
 
-                      return (
-                        <div
-                          key={
-                            item.id
-                          }
-                          style={
-                            styles.selectedItem
-                          }
-                        >
-                          <div
-                            style={
-                              styles.selectedItemTop
-                            }
-                          >
+                    return (
+                      <div
+                        key={item.id}
+                        style={styles.selectedItem}
+                      >
+                        {/* НАЗВАНИЕ */}
+
+                        <div style={styles.selectedItemTop}>
+                          <div style={{ minWidth: 0 }}>
                             <div
-                              style={{
-                                minWidth:
-                                  0,
-                              }}
+                              style={
+                                styles.selectedItemName
+                              }
                             >
-                              <div
-                                style={
-                                  styles.selectedItemName
-                                }
-                              >
-                                {
-                                  item.name
-                                }
-                              </div>
+                              {item.name}
+                            </div>
 
+                            {item.isOption ? (
                               <div
                                 style={
                                   styles.selectedItemType
                                 }
                               >
-                                {item.isOption
-                                  ? "Дополнительная опция"
-                                  : "Оборудование"}
+                                Дополнительная опция
                               </div>
-                            </div>
+                            ) : null}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeProduct(item.id)
+                            }
+                            title="Удалить"
+                            style={styles.removeButton}
+                          >
+                            ×
+                          </button>
+                        </div>
+
+                        {/* ЦЕНА ЗА 1 ШТ */}
+
+                        <div
+                          style={
+                            styles.selectedUnitPrices
+                          }
+                        >
+                          <div
+                            style={
+                              styles.selectedUnitRow
+                            }
+                          >
+                            <span>
+                              Без НДС
+                            </span>
+
+                            <strong
+                              style={
+                                styles.selectedWithoutVatText
+                              }
+                            >
+                              {formatMoney(
+                                unitWithoutVat
+                              )}{" "}
+                              BYN
+                            </strong>
+                          </div>
+
+                          <div
+                            style={
+                              styles.selectedUnitRow
+                            }
+                          >
+                            <span>
+                              С НДС
+                            </span>
+
+                            <strong
+                              style={
+                                styles.selectedWithVatText
+                              }
+                            >
+                              {formatMoney(
+                                unitWithVat
+                              )}{" "}
+                              BYN
+                            </strong>
+                          </div>
+                        </div>
+
+                        {/* КОЛИЧЕСТВО + СУММА */}
+
+                        <div
+                          style={
+                            styles.qtyAndTotal
+                          }
+                        >
+                          <div
+                            style={
+                              styles.qtyControl
+                            }
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                decreaseQty(
+                                  item.id
+                                )
+                              }
+                              style={
+                                styles.qtyButton
+                              }
+                            >
+                              −
+                            </button>
+
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.qty}
+                              onChange={(e) =>
+                                changeQty(
+                                  item.id,
+                                  e.target.value
+                                )
+                              }
+                              style={
+                                styles.qtyInput
+                              }
+                            />
 
                             <button
                               type="button"
                               onClick={() =>
-                                removeProduct(
+                                increaseQty(
                                   item.id
                                 )
                               }
-                              title="Удалить"
                               style={
-                                styles.removeButton
+                                styles.qtyButton
                               }
                             >
-                              ×
+                              +
                             </button>
                           </div>
 
                           <div
                             style={
-                              styles.selectedUnitPrices
+                              styles.lineTotal
                             }
                           >
                             <div
                               style={
-                                styles.selectedUnitRow
+                                styles.lineWithoutVat
                               }
                             >
-                              <span>
-                                RUB
-                              </span>
-
-                              <strong>
-                                {formatRub(
-                                  item.priceRub
-                                )}
-                              </strong>
+                              {formatMoney(
+                                lineWithoutVat
+                              )}{" "}
+                              BYN без НДС
                             </div>
 
                             <div
                               style={
-                                styles.selectedUnitRow
+                                styles.lineWithVat
                               }
                             >
-                              <span>
-                                Без НДС
-                              </span>
-
-                              <strong
-                                style={
-                                  styles.selectedWithoutVatText
-                                }
-                              >
-                                {formatMoney(
-                                  unitWithoutVat
-                                )}{" "}
-                                BYN
-                              </strong>
-                            </div>
-
-                            <div
-                              style={
-                                styles.selectedUnitRow
-                              }
-                            >
-                              <span>
-                                С НДС
-                              </span>
-
-                              <strong
-                                style={
-                                  styles.selectedWithVatText
-                                }
-                              >
-                                {formatMoney(
-                                  unitWithVat
-                                )}{" "}
-                                BYN
-                              </strong>
-                            </div>
-                          </div>
-
-                          <div
-                            style={
-                              styles.qtyAndTotal
-                            }
-                          >
-                            <div
-                              style={
-                                styles.qtyControl
-                              }
-                            >
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  decreaseQty(
-                                    item.id
-                                  )
-                                }
-                                style={
-                                  styles.qtyButton
-                                }
-                              >
-                                −
-                              </button>
-
-                              <input
-                                type="number"
-                                min="1"
-                                value={
-                                  item.qty
-                                }
-                                onChange={(
-                                  e
-                                ) =>
-                                  changeQty(
-                                    item.id,
-                                    e.target
-                                      .value
-                                  )
-                                }
-                                style={
-                                  styles.qtyInput
-                                }
-                              />
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  increaseQty(
-                                    item.id
-                                  )
-                                }
-                                style={
-                                  styles.qtyButton
-                                }
-                              >
-                                +
-                              </button>
-                            </div>
-
-                            <div
-                              style={
-                                styles.lineTotal
-                              }
-                            >
-                              <div
-                                style={
-                                  styles.lineTotalRub
-                                }
-                              >
-                                {formatRub(
-                                  lineRub
-                                )}{" "}
-                                RUB
-                              </div>
-
-                              <div
-                                style={
-                                  styles.lineWithoutVat
-                                }
-                              >
-                                {formatMoney(
-                                  lineWithoutVat
-                                )}{" "}
-                                BYN без НДС
-                              </div>
-
-                              <div
-                                style={
-                                  styles.lineWithVat
-                                }
-                              >
-                                {formatMoney(
-                                  lineWithVat
-                                )}{" "}
-                                BYN с НДС
-                              </div>
+                              {formatMoney(
+                                lineWithVat
+                              )}{" "}
+                              BYN с НДС
                             </div>
                           </div>
                         </div>
-                      );
-                    }
-                  )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* ИТОГ */}
 
-                <div
-                  style={
-                    styles.totalBlock
-                  }
-                >
-                  <div
-                    style={
-                      styles.totalSmallRow
-                    }
-                  >
+                <div style={styles.totalBlock}>
+                  <div style={styles.totalSmallRow}>
                     <span>
                       Всего товаров
                     </span>
@@ -1230,28 +1000,9 @@ export default function DistKontrolPage() {
                     </strong>
                   </div>
 
-                  <div
-                    style={
-                      styles.totalSmallRow
-                    }
-                  >
-                    <span>
-                      Итого RUB
-                    </span>
+                  <div style={styles.totalPrices}>
+                    {/* БЕЗ НДС */}
 
-                    <strong>
-                      {formatRub(
-                        totals.rub
-                      )}{" "}
-                      ₽
-                    </strong>
-                  </div>
-
-                  <div
-                    style={
-                      styles.totalPrices
-                    }
-                  >
                     <div
                       style={
                         styles.totalWithoutVatBox
@@ -1263,15 +1014,7 @@ export default function DistKontrolPage() {
                             styles.totalPriceLabel
                           }
                         >
-                          Без НДС
-                        </div>
-
-                        <div
-                          style={
-                            styles.totalPriceHint
-                          }
-                        >
-                          RUB × курс
+                          Итого без НДС
                         </div>
                       </div>
 
@@ -1287,6 +1030,8 @@ export default function DistKontrolPage() {
                       </div>
                     </div>
 
+                    {/* С НДС */}
+
                     <div
                       style={
                         styles.totalWithVatBox
@@ -1298,15 +1043,7 @@ export default function DistKontrolPage() {
                             styles.totalPriceLabel
                           }
                         >
-                          С НДС
-                        </div>
-
-                        <div
-                          style={
-                            styles.totalPriceHint
-                          }
-                        >
-                          + 20% НДС
+                          Итого с НДС
                         </div>
                       </div>
 
@@ -1325,9 +1062,7 @@ export default function DistKontrolPage() {
 
                   <button
                     type="button"
-                    onClick={
-                      copyConfiguration
-                    }
+                    onClick={copyConfiguration}
                     style={
                       styles.copyConfigurationButton
                     }
@@ -1343,7 +1078,9 @@ export default function DistKontrolPage() {
         </div>
       </div>
 
-      {/* АДАПТИВ */}
+      {/* =====================================================
+          АДАПТИВ
+      ===================================================== */}
 
       <style jsx>{`
         @media (max-width: 1300px) {
@@ -1400,7 +1137,7 @@ export default function DistKontrolPage() {
 }
 
 /* =========================================================
-   ГРУППА ТОВАРОВ
+   ГРУППА ПРАЙСА
 ========================================================= */
 
 function PriceGroup({
@@ -1417,11 +1154,7 @@ function PriceGroup({
             {group.title}
           </div>
 
-          <div
-            style={
-              styles.groupDescription
-            }
-          >
+          <div style={styles.groupDescription}>
             {group.description}
           </div>
         </div>
@@ -1465,19 +1198,11 @@ function PriceGroup({
           Цена RUB
         </div>
 
-        <div
-          style={
-            styles.withoutVatHeader
-          }
-        >
+        <div style={styles.withoutVatHeader}>
           Без НДС
         </div>
 
-        <div
-          style={
-            styles.withVatHeader
-          }
-        >
+        <div style={styles.withVatHeader}>
           С НДС
         </div>
 
@@ -1510,11 +1235,14 @@ function PriceGroup({
                 className="price-row"
                 style={{
                   ...styles.priceRow,
+
                   ...(product.isOption
                     ? styles.optionRow
                     : {}),
                 }}
               >
+                {/* NAME */}
+
                 <div
                   className="price-name"
                 >
@@ -1537,6 +1265,8 @@ function PriceGroup({
                   ) : null}
                 </div>
 
+                {/* РЕКОМЕНДОВАННАЯ */}
+
                 <div
                   className="desktop-secondary"
                   style={
@@ -1547,6 +1277,8 @@ function PriceGroup({
                     product.recommendedRub
                   )}
                 </div>
+
+                {/* СКИДКА */}
 
                 <div
                   className="desktop-secondary"
@@ -1560,6 +1292,8 @@ function PriceGroup({
                     : "—"}
                 </div>
 
+                {/* RUB */}
+
                 <div
                   style={
                     styles.rubPriceCell
@@ -1569,6 +1303,8 @@ function PriceGroup({
                     product.priceRub
                   )}
                 </div>
+
+                {/* БЕЗ НДС */}
 
                 <div
                   style={
@@ -1580,6 +1316,8 @@ function PriceGroup({
                   )}
                 </div>
 
+                {/* С НДС */}
+
                 <div
                   style={
                     styles.withVatPriceCell
@@ -1589,6 +1327,8 @@ function PriceGroup({
                     priceWithVat
                   )}
                 </div>
+
+                {/* ADD */}
 
                 <div
                   className="add-cell"
@@ -1603,6 +1343,7 @@ function PriceGroup({
                     }
                     style={{
                       ...styles.addButton,
+
                       ...(selectedItem
                         ? styles.addButtonSelected
                         : {}),
@@ -1633,6 +1374,8 @@ const styles = {
     paddingBottom: 50,
   },
 
+  /* HEADER */
+
   pageHeader: {
     marginBottom: 14,
   },
@@ -1650,6 +1393,8 @@ const styles = {
     color: "#777",
     marginTop: 4,
   },
+
+  /* TOP */
 
   topCard: {
     background: "#fff",
@@ -1765,8 +1510,7 @@ const styles = {
     position: "absolute",
     top: "50%",
     right: 8,
-    transform:
-      "translateY(-50%)",
+    transform: "translateY(-50%)",
     width: 28,
     height: 28,
     border: "none",
@@ -1781,11 +1525,12 @@ const styles = {
   formulaNote: {
     marginTop: 10,
     paddingTop: 9,
-    borderTop:
-      "1px solid #ececec",
+    borderTop: "1px solid #ececec",
     fontSize: 10,
     color: "#888",
   },
+
+  /* MAIN */
 
   mainGrid: {
     display: "grid",
@@ -1795,10 +1540,11 @@ const styles = {
     gap: 14,
   },
 
+  /* GROUP */
+
   groupCard: {
     background: "#fff",
-    border:
-      "1px solid #e2e2e2",
+    border: "1px solid #e2e2e2",
     borderRadius: 12,
     overflow: "hidden",
     marginBottom: 12,
@@ -1809,12 +1555,10 @@ const styles = {
     padding: "12px 14px",
     display: "flex",
     alignItems: "center",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     gap: 12,
     background: "#fafafa",
-    borderBottom:
-      "1px solid #e7e7e7",
+    borderBottom: "1px solid #e7e7e7",
   },
 
   groupTitle: {
@@ -1839,6 +1583,8 @@ const styles = {
     whiteSpace: "nowrap",
   },
 
+  /* TABLE */
+
   priceHeader: {
     display: "grid",
     gridTemplateColumns:
@@ -1849,8 +1595,7 @@ const styles = {
     padding: "0 12px",
     boxSizing: "border-box",
     background: "#f5f5f5",
-    borderBottom:
-      "1px solid #e3e3e3",
+    borderBottom: "1px solid #e3e3e3",
     fontSize: 9,
     fontWeight: 750,
     color: "#777",
@@ -1882,8 +1627,7 @@ const styles = {
     minHeight: 62,
     padding: "8px 12px",
     boxSizing: "border-box",
-    borderBottom:
-      "1px solid #ededed",
+    borderBottom: "1px solid #ededed",
   },
 
   optionRow: {
@@ -1913,8 +1657,7 @@ const styles = {
     textAlign: "right",
     fontSize: 11,
     color: "#8a8a8a",
-    textDecoration:
-      "line-through",
+    textDecoration: "line-through",
   },
 
   discountCell: {
@@ -1959,8 +1702,7 @@ const styles = {
   addButton: {
     minWidth: 92,
     height: 32,
-    border:
-      "1px solid #d1d1d1",
+    border: "1px solid #d1d1d1",
     borderRadius: 7,
     background: "#fff",
     color: "#222",
@@ -1972,11 +1714,12 @@ const styles = {
   },
 
   addButtonSelected: {
-    border:
-      "1px solid #cbdac3",
+    border: "1px solid #cbdac3",
     background: "#f2f8ef",
     color: "#46643d",
   },
+
+  /* CONFIG */
 
   configurationColumn: {
     position: "sticky",
@@ -1985,8 +1728,7 @@ const styles = {
 
   configurationCard: {
     background: "#fff",
-    border:
-      "1px solid #dddddd",
+    border: "1px solid #dddddd",
     borderRadius: 12,
     overflow: "hidden",
     boxShadow:
@@ -1995,13 +1737,11 @@ const styles = {
 
   configurationHeader: {
     display: "flex",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     alignItems: "flex-start",
     gap: 10,
     padding: 14,
-    borderBottom:
-      "1px solid #e7e7e7",
+    borderBottom: "1px solid #e7e7e7",
   },
 
   configurationTitle: {
@@ -2025,6 +1765,8 @@ const styles = {
     cursor: "pointer",
     textDecoration: "underline",
   },
+
+  /* EMPTY */
 
   emptyCart: {
     padding: "45px 25px",
@@ -2058,37 +1800,37 @@ const styles = {
     color: "#999",
   },
 
+  /* SELECTED */
+
   selectedList: {
     maxHeight:
-      "calc(100vh - 390px)",
+      "calc(100vh - 350px)",
     minHeight: 90,
     overflowY: "auto",
   },
 
   selectedItem: {
-    padding: "11px 12px",
-    borderBottom:
-      "1px solid #eeeeee",
+    padding: "12px",
+    borderBottom: "1px solid #eeeeee",
   },
 
   selectedItemTop: {
     display: "flex",
     alignItems: "flex-start",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     gap: 7,
   },
 
   selectedItemName: {
-    fontSize: 11,
-    fontWeight: 750,
+    fontSize: 12,
+    fontWeight: 800,
     lineHeight: 1.35,
     color: "#222",
     wordBreak: "break-word",
   },
 
   selectedItemType: {
-    marginTop: 2,
+    marginTop: 3,
     fontSize: 8,
     color: "#999",
   },
@@ -2106,50 +1848,52 @@ const styles = {
     lineHeight: 1,
   },
 
+  /* ЦЕНА 1 ШТ */
+
   selectedUnitPrices: {
     display: "grid",
-    gap: 4,
-    marginTop: 9,
-    padding: 8,
+    gap: 5,
+    marginTop: 10,
+    padding: 9,
     borderRadius: 7,
     background: "#fafafa",
-    border:
-      "1px solid #eeeeee",
+    border: "1px solid #eeeeee",
   },
 
   selectedUnitRow: {
     display: "flex",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     alignItems: "center",
     gap: 10,
-    fontSize: 9,
+    fontSize: 10,
     color: "#777",
   },
 
   selectedWithoutVatText: {
     color: "#185f7a",
+    fontSize: 11,
   },
 
   selectedWithVatText: {
     color: "#426d31",
+    fontSize: 12,
   },
+
+  /* QTY */
 
   qtyAndTotal: {
     display: "flex",
     alignItems: "center",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     gap: 10,
-    marginTop: 9,
+    marginTop: 10,
   },
 
   qtyControl: {
     display: "flex",
     alignItems: "center",
     height: 30,
-    border:
-      "1px solid #d8d8d8",
+    border: "1px solid #d8d8d8",
     borderRadius: 7,
     overflow: "hidden",
   },
@@ -2168,10 +1912,8 @@ const styles = {
     width: 37,
     height: 28,
     border: "none",
-    borderLeft:
-      "1px solid #e0e0e0",
-    borderRight:
-      "1px solid #e0e0e0",
+    borderLeft: "1px solid #e0e0e0",
+    borderRight: "1px solid #e0e0e0",
     textAlign: "center",
     fontSize: 11,
     fontWeight: 700,
@@ -2183,24 +1925,20 @@ const styles = {
     textAlign: "right",
   },
 
-  lineTotalRub: {
-    fontSize: 9,
-    color: "#888",
-  },
-
   lineWithoutVat: {
-    marginTop: 2,
     fontSize: 9,
     fontWeight: 700,
     color: "#24728f",
   },
 
   lineWithVat: {
-    marginTop: 2,
+    marginTop: 3,
     fontSize: 11,
     fontWeight: 800,
     color: "#426d31",
   },
+
+  /* TOTAL */
 
   totalBlock: {
     padding: 13,
@@ -2210,8 +1948,7 @@ const styles = {
   totalSmallRow: {
     display: "flex",
     alignItems: "center",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     gap: 10,
     marginBottom: 6,
     fontSize: 9,
@@ -2223,33 +1960,28 @@ const styles = {
     gap: 7,
     marginTop: 10,
     paddingTop: 10,
-    borderTop:
-      "1px solid #dedede",
+    borderTop: "1px solid #dedede",
   },
 
   totalWithoutVatBox: {
     display: "flex",
     alignItems: "center",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     gap: 10,
     padding: 10,
     borderRadius: 8,
-    border:
-      "1px solid #cfe9f2",
+    border: "1px solid #cfe9f2",
     background: "#eef9fd",
   },
 
   totalWithVatBox: {
     display: "flex",
     alignItems: "center",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     gap: 10,
     padding: 10,
     borderRadius: 8,
-    border:
-      "1px solid #d5e8cb",
+    border: "1px solid #d5e8cb",
     background: "#f3faef",
   },
 
@@ -2257,12 +1989,6 @@ const styles = {
     fontSize: 11,
     fontWeight: 800,
     color: "#333",
-  },
-
-  totalPriceHint: {
-    marginTop: 2,
-    fontSize: 8,
-    color: "#999",
   },
 
   totalWithoutVat: {
@@ -2292,11 +2018,12 @@ const styles = {
     fontWeight: 700,
   },
 
+  /* SEARCH EMPTY */
+
   emptySearch: {
     padding: 45,
     textAlign: "center",
-    border:
-      "1px solid #e2e2e2",
+    border: "1px solid #e2e2e2",
     borderRadius: 12,
     background: "#fff",
   },
